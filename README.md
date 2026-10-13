@@ -115,6 +115,10 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 - Does not include authentication or remote hosting support.
 - No bundled installer, packaging, or automated setup script.
 
+## Acknowledgments
+
+Special thanks to **[Matt Pocock](https://github.com/mattpocock)** for his work on Sandcastle and for inspiring this pixel-art view of the agent workflow.
+
 ## Contributing
 
 Issues and pull requests are welcome. Please avoid including tokens, private logs, or personal filesystem paths in bug reports.
