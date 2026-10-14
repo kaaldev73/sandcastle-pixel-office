@@ -2,7 +2,7 @@
 """Read-only local Sandcastle Pixel Office. Python standard library only."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import json, re, time, os, sys
+import json, re, time, os, sys, mimetypes
 
 ROOT = Path(os.environ.get("SANDCASTLE_PROJECT", "/home/pcs/Documents/Git/chatgpt-organizer")).resolve()
 LOGS = ROOT / ".sandcastle" / "logs"
@@ -47,6 +47,15 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/":
             body = PAGE.read_bytes()
             mime = "text/html; charset=utf-8"
+        elif self.path.startswith("/assets/pixel-office/"):
+            # Serve only local V2 artwork; never expose arbitrary project files.
+            assets = (Path(__file__).resolve().parent / "assets" / "pixel-office").resolve()
+            requested = (assets / self.path.removeprefix("/assets/pixel-office/")).resolve()
+            if not requested.is_relative_to(assets) or not requested.is_file():
+                self.send_error(404)
+                return
+            body = requested.read_bytes()
+            mime = mimetypes.guess_type(requested.name)[0] or "application/octet-stream"
         else:
             self.send_error(404)
             return

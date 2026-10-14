@@ -1,0 +1,521 @@
+{
+  "characters": {
+    "planner": {
+      "frame_canvas": [
+        270,
+        276
+      ],
+      "normalized_sheet": "characters/planner-sheet-normalized.png",
+      "sequence_groups": {
+        "idle": [
+          "idle"
+        ],
+        "working": [
+          "working-1",
+          "working-2",
+          "working-3",
+          "working-4"
+        ],
+        "waiting": [
+          "waiting-1",
+          "waiting-2"
+        ],
+        "done": [
+          "done-1",
+          "done-2"
+        ],
+        "error": [
+          "error-1",
+          "error-2"
+        ]
+      },
+      "frames": [
+        {
+          "state": "idle",
+          "file": "characters/planner/idle.png",
+          "size": [
+            205,
+            275
+          ]
+        },
+        {
+          "state": "working-1",
+          "file": "characters/planner/working-1.png",
+          "size": [
+            209,
+            273
+          ]
+        },
+        {
+          "state": "working-2",
+          "file": "characters/planner/working-2.png",
+          "size": [
+            209,
+            272
+          ]
+        },
+        {
+          "state": "working-3",
+          "file": "characters/planner/working-3.png",
+          "size": [
+            211,
+            272
+          ]
+        },
+        {
+          "state": "working-4",
+          "file": "characters/planner/working-4.png",
+          "size": [
+            210,
+            272
+          ]
+        },
+        {
+          "state": "waiting-1",
+          "file": "characters/planner/waiting-1.png",
+          "size": [
+            207,
+            276
+          ]
+        },
+        {
+          "state": "waiting-2",
+          "file": "characters/planner/waiting-2.png",
+          "size": [
+            210,
+            274
+          ]
+        },
+        {
+          "state": "done-1",
+          "file": "characters/planner/done-1.png",
+          "size": [
+            249,
+            270
+          ]
+        },
+        {
+          "state": "done-2",
+          "file": "characters/planner/done-2.png",
+          "size": [
+            209,
+            269
+          ]
+        },
+        {
+          "state": "error-1",
+          "file": "characters/planner/error-1.png",
+          "size": [
+            270,
+            255
+          ]
+        },
+        {
+          "state": "error-2",
+          "file": "characters/planner/error-2.png",
+          "size": [
+            210,
+            248
+          ]
+        }
+      ]
+    },
+    "implementer": {
+      "frame_canvas": [
+        278,
+        272
+      ],
+      "normalized_sheet": "characters/implementer-sheet-normalized.png",
+      "sequence_groups": {
+        "idle": [
+          "idle"
+        ],
+        "working": [
+          "working-1",
+          "working-2",
+          "working-3",
+          "working-4"
+        ],
+        "waiting": [
+          "waiting-1",
+          "waiting-2"
+        ],
+        "done": [
+          "done-1",
+          "done-2"
+        ],
+        "error": [
+          "error-1",
+          "error-2"
+        ]
+      },
+      "frames": [
+        {
+          "state": "idle",
+          "file": "characters/implementer/idle.png",
+          "size": [
+            211,
+            272
+          ]
+        },
+        {
+          "state": "working-1",
+          "file": "characters/implementer/working-1.png",
+          "size": [
+            214,
+            270
+          ]
+        },
+        {
+          "state": "working-2",
+          "file": "characters/implementer/working-2.png",
+          "size": [
+            221,
+            268
+          ]
+        },
+        {
+          "state": "working-3",
+          "file": "characters/implementer/working-3.png",
+          "size": [
+            215,
+            267
+          ]
+        },
+        {
+          "state": "working-4",
+          "file": "characters/implementer/working-4.png",
+          "size": [
+            220,
+            265
+          ]
+        },
+        {
+          "state": "waiting-1",
+          "file": "characters/implementer/waiting-1.png",
+          "size": [
+            219,
+            264
+          ]
+        },
+        {
+          "state": "waiting-2",
+          "file": "characters/implementer/waiting-2.png",
+          "size": [
+            239,
+            266
+          ]
+        },
+        {
+          "state": "done-1",
+          "file": "characters/implementer/done-1.png",
+          "size": [
+            216,
+            267
+          ]
+        },
+        {
+          "state": "done-2",
+          "file": "characters/implementer/done-2.png",
+          "size": [
+            232,
+            267
+          ]
+        },
+        {
+          "state": "error-1",
+          "file": "characters/implementer/error-1.png",
+          "size": [
+            215,
+            251
+          ]
+        },
+        {
+          "state": "error-2",
+          "file": "characters/implementer/error-2.png",
+          "size": [
+            278,
+            252
+          ]
+        }
+      ]
+    },
+    "reviewer": {
+      "frame_canvas": [
+        272,
+        265
+      ],
+      "normalized_sheet": "characters/reviewer-sheet-normalized.png",
+      "sequence_groups": {
+        "idle": [
+          "idle"
+        ],
+        "working": [
+          "working-1",
+          "working-2",
+          "working-3",
+          "working-4"
+        ],
+        "waiting": [
+          "waiting-1",
+          "waiting-2"
+        ],
+        "done": [
+          "done-1",
+          "done-2"
+        ],
+        "error": [
+          "error-1",
+          "error-2"
+        ]
+      },
+      "frames": [
+        {
+          "state": "idle",
+          "file": "characters/reviewer/idle.png",
+          "size": [
+            210,
+            264
+          ]
+        },
+        {
+          "state": "working-1",
+          "file": "characters/reviewer/working-1.png",
+          "size": [
+            213,
+            261
+          ]
+        },
+        {
+          "state": "working-2",
+          "file": "characters/reviewer/working-2.png",
+          "size": [
+            214,
+            259
+          ]
+        },
+        {
+          "state": "working-3",
+          "file": "characters/reviewer/working-3.png",
+          "size": [
+            214,
+            259
+          ]
+        },
+        {
+          "state": "working-4",
+          "file": "characters/reviewer/working-4.png",
+          "size": [
+            210,
+            261
+          ]
+        },
+        {
+          "state": "waiting-1",
+          "file": "characters/reviewer/waiting-1.png",
+          "size": [
+            210,
+            265
+          ]
+        },
+        {
+          "state": "waiting-2",
+          "file": "characters/reviewer/waiting-2.png",
+          "size": [
+            213,
+            259
+          ]
+        },
+        {
+          "state": "done-1",
+          "file": "characters/reviewer/done-1.png",
+          "size": [
+            228,
+            257
+          ]
+        },
+        {
+          "state": "done-2",
+          "file": "characters/reviewer/done-2.png",
+          "size": [
+            212,
+            257
+          ]
+        },
+        {
+          "state": "error-1",
+          "file": "characters/reviewer/error-1.png",
+          "size": [
+            272,
+            255
+          ]
+        },
+        {
+          "state": "error-2",
+          "file": "characters/reviewer/error-2.png",
+          "size": [
+            214,
+            250
+          ]
+        }
+      ]
+    },
+    "merger": {
+      "frame_canvas": [
+        272,
+        271
+      ],
+      "normalized_sheet": "characters/merger-sheet-normalized.png",
+      "sequence_groups": {
+        "idle": [
+          "idle"
+        ],
+        "working": [
+          "working-1",
+          "working-2",
+          "working-3",
+          "working-4"
+        ],
+        "waiting": [
+          "waiting-1",
+          "waiting-2"
+        ],
+        "done": [
+          "done-1",
+          "done-2"
+        ],
+        "error": [
+          "error-1",
+          "error-2"
+        ]
+      },
+      "frames": [
+        {
+          "state": "idle",
+          "file": "characters/merger/idle.png",
+          "size": [
+            211,
+            271
+          ]
+        },
+        {
+          "state": "working-1",
+          "file": "characters/merger/working-1.png",
+          "size": [
+            217,
+            270
+          ]
+        },
+        {
+          "state": "working-2",
+          "file": "characters/merger/working-2.png",
+          "size": [
+            216,
+            268
+          ]
+        },
+        {
+          "state": "working-3",
+          "file": "characters/merger/working-3.png",
+          "size": [
+            213,
+            268
+          ]
+        },
+        {
+          "state": "working-4",
+          "file": "characters/merger/working-4.png",
+          "size": [
+            220,
+            269
+          ]
+        },
+        {
+          "state": "waiting-1",
+          "file": "characters/merger/waiting-1.png",
+          "size": [
+            222,
+            269
+          ]
+        },
+        {
+          "state": "waiting-2",
+          "file": "characters/merger/waiting-2.png",
+          "size": [
+            216,
+            267
+          ]
+        },
+        {
+          "state": "done-1",
+          "file": "characters/merger/done-1.png",
+          "size": [
+            217,
+            267
+          ]
+        },
+        {
+          "state": "done-2",
+          "file": "characters/merger/done-2.png",
+          "size": [
+            250,
+            265
+          ]
+        },
+        {
+          "state": "error-1",
+          "file": "characters/merger/error-1.png",
+          "size": [
+            217,
+            250
+          ]
+        },
+        {
+          "state": "error-2",
+          "file": "characters/merger/error-2.png",
+          "size": [
+            272,
+            249
+          ]
+        }
+      ]
+    }
+  },
+  "workstations": {
+    "planner": {
+      "file": "workstations/planner.png",
+      "size": [
+        1393,
+        883
+      ]
+    },
+    "implementer": {
+      "file": "workstations/implementer.png",
+      "size": [
+        1318,
+        909
+      ]
+    },
+    "reviewer": {
+      "file": "workstations/reviewer.png",
+      "size": [
+        1397,
+        866
+      ]
+    },
+    "merger": {
+      "file": "workstations/merger.png",
+      "size": [
+        1401,
+        937
+      ]
+    }
+  },
+  "background": {
+    "office": "background/office-background.png",
+    "size": [
+      1672,
+      941
+    ]
+  }
+}
