@@ -18,6 +18,14 @@ export interface ProjectSummary {
   /** The port its app runs on (from projects.json, or guessed from its dev scripts), whether something's listening there, and where to open it. */
   port: number | null;
   portGuessed: boolean;
+  /** The folder Pixel Office serves its built app from (on `port`), if it does; or true if that folder isn't built yet. */
+  served: string | null;
+  unbuilt: boolean;
+  /** Whether projects.json gives it a command to run its app; whether that's running, started from the computer (and how it ended, if it has); what it printed last. */
+  runnable: boolean;
+  started: boolean;
+  exitCode: number | null;
+  output: string[];
   running: boolean;
   url: string | null;
 }
@@ -45,12 +53,18 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const fetchProjects = () => get<{ projects: ProjectSummary[] }>('/api/projects').then((r) => r.projects);
-/** Opens a GitHub issue on the project's repo, for the Planner to pick up: its address, or why not. */
-export async function fileIssue(project: string, title: string, body: string): Promise<string> {
-  const res = await fetch('/api/issues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, title, body }) });
-  const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-  if (!res.ok || !data.url) throw new Error(data.error ?? `HTTP ${res.status}`);
-  return data.url;
+async function post<T>(url: string, body: object): Promise<T> {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data;
 }
+
+/** Opens a GitHub issue on the project's repo, for the Planner to pick up: its address, or why not. */
+export const fileIssue = (project: string, title: string, body: string) => post<{ url: string }>('/api/issues', { project, title, body }).then((r) => r.url);
+
+/** Runs a project's app with its "run" command from projects.json, or stops it again. */
+export const startApp = (project: string) => post('/api/apps/start', { project });
+export const stopApp = (project: string) => post('/api/apps/stop', { project });
 
 export const fetchStatus = (project: string) => get<StatusSnapshot>(`/api/status?project=${encodeURIComponent(project)}`);

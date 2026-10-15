@@ -6,5 +6,6 @@ export default defineConfig({
   root: 'client',
   base: '/',
   build: { outDir: '../dist', emptyOutDir: true, assetsDir: 'static', chunkSizeWarningLimit: 900 },
-  server: { proxy: { '/api': 'http://127.0.0.1:8765' } },
+  // Keeping the page's Host header: server.py checks it against the Origin before running anything.
+  server: { proxy: { '/api': { target: 'http://127.0.0.1:8765', changeOrigin: false } } },
 });

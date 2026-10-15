@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Sandcastle • Pixel Office</title>
     <link rel="icon" href="data:," />
-    <script type="module" crossorigin src="/static/index-Crl7axbw.js"></script>
-    <link rel="stylesheet" crossorigin href="/static/index-DLQze4kV.css">
+    <script type="module" crossorigin src="/static/index-BaJSVdyQ.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/index-9a1IPpw6.css">
   </head>
   <body>
     <canvas id="scene"></canvas>
@@ -58,9 +58,10 @@
         <button class="icon" data-open="games"><span class="glyph">📁</span><span class="name">Games</span></button>
         <button class="icon" data-open="projects"><span class="glyph">📁</span><span class="name">Projects</span></button>
         <button class="icon" data-open="issue"><span class="glyph">📝</span><span class="name">New issue</span></button>
+        <div id="pc-shortcuts" class="shortcuts"></div>
       </div>
       <div class="win" id="pc-win" hidden>
-        <div class="win-bar"><span id="pc-win-title"></span><button class="win-x" id="pc-win-close" title="Close (Esc)">✕</button></div>
+        <div class="win-bar"><span id="pc-win-title"></span><span class="spacer"></span><a class="win-x btn" id="pc-win-out" target="_blank" rel="noopener" title="Open it in its own browser tab" hidden>↗ Open outside</a><button class="win-x" id="pc-win-stop" hidden>■ Stop server</button><button class="win-x" id="pc-win-close" title="Close (Esc)">✕</button></div>
         <div class="win-body">
           <div id="pc-games" class="folder" hidden></div>
           <div id="pc-game" class="game" hidden>
@@ -68,6 +69,14 @@
             <div class="muted small">Arrows or WASD move · Space / Enter action · P pause · M sound · Esc back to Games</div>
           </div>
           <div id="pc-projects" class="apps" hidden></div>
+          <div id="pc-app" class="app-frame" hidden>
+            <iframe id="pc-app-frame" title="App"></iframe>
+            <div id="pc-app-boot" class="boot" hidden>
+              <h2 id="pc-app-state"></h2>
+              <div id="pc-app-output" class="feed"></div>
+              <div class="row"><span class="spacer"></span><button id="pc-app-run" class="primary">▶ Run</button></div>
+            </div>
+          </div>
           <div id="pc-issue" class="issue" hidden>
             <form id="pc-issue-form">
               <label class="field">Project <select id="issue-project"></select></label>

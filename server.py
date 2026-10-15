@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Local Sandcastle Pixel Office. Python standard library only.
 
-It only reads Sandcastle's logs: it never starts or stops agents. The one thing it writes is a GitHub
-issue, when you file one from the CEO's computer (with `gh`, in that project's folder)."""
+It only reads Sandcastle's logs: it never starts or stops agents. From the CEO's computer you can file
+a GitHub issue (with `gh`, in that project's folder), and run and stop a project's app with the command
+projects.json gives it (its "run"). A project can also have its built app served (read-only, on a port
+of its own). Apps it started are stopped when it stops."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import json, re, time, os, sys, mimetypes, socket, subprocess
+import json, re, time, os, sys, mimetypes, socket, subprocess, threading, zlib, shlex, signal, atexit
+from collections import deque
+from functools import partial
+from http.server import SimpleHTTPRequestHandler
 
 from urllib.parse import urlsplit, parse_qs
 
@@ -34,7 +39,8 @@ def load_projects():
                     continue
                 seen.add(pid)
                 projects.append({"id": pid, "name": str(item.get("name") or path.name), "root": path,
-                                 "description": item.get("description"), "port": item.get("port"), "url": item.get("url")})
+                                 "description": item.get("description"), "port": item.get("port"), "url": item.get("url"),
+                                 "serve": item.get("serve"), "page": item.get("page"), "run": item.get("run")})
             if projects:
                 return projects
         except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
@@ -90,11 +96,103 @@ def guess_port(root):
     return None
 
 def listening(port):
+    # "localhost": dev servers listen on 127.0.0.1 or ::1, and this tries both.
     try:
-        with socket.create_connection(("127.0.0.1", port), timeout=0.15):
+        with socket.create_connection(("localhost", port), timeout=0.15):
             return True
     except OSError:
         return False
+
+class AppFiles(SimpleHTTPRequestHandler):
+    """A built app's files, as they are: no folder listings, nothing cached, nothing logged."""
+    def list_directory(self, path):
+        self.send_error(404)
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+    def log_message(self, fmt, *args):
+        pass
+
+SERVED, SERVED_LOCK = {}, threading.Lock()
+
+def serve_app(project):
+    """Serves the project's built app folder (its "serve" in projects.json) on a local port, once: its
+    "port", or one worked out from its id. Always the same port, since the browser keeps an app's saved
+    data (IndexedDB, localStorage) per port."""
+    folder = (project["root"] / str(project["serve"])).resolve()
+    if not folder.is_relative_to(project["root"]) or not folder.is_dir():
+        return None
+    port = project["port"] if isinstance(project["port"], int) else 41000 + zlib.crc32(project["id"].encode()) % 1000
+    with SERVED_LOCK:
+        if folder not in SERVED:
+            try:
+                httpd = ThreadingHTTPServer(("127.0.0.1", port), partial(AppFiles, directory=str(folder)))
+            except OSError as e:
+                print(f"Can't serve {folder} on port {port}: {e}", file=sys.stderr, flush=True)
+                SERVED[folder] = None
+            else:
+                threading.Thread(target=httpd.serve_forever, daemon=True).start()
+                SERVED[folder] = port
+        return SERVED[folder]
+
+class App:
+    """A project's app, started from the CEO's computer: its process and the last of what it printed."""
+    def __init__(self, project):
+        self.output = deque(maxlen=60)
+        # Its own process group, so stopping it stops whatever it started too (npm starting vite, say).
+        self.proc = subprocess.Popen(shlex.split(project["run"]), cwd=project["root"], stdin=subprocess.DEVNULL,
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",
+                                     start_new_session=True, env={**os.environ, "BROWSER": "none", "FORCE_COLOR": "0"})
+        threading.Thread(target=self.read, daemon=True).start()
+
+    def read(self):
+        for line in self.proc.stdout:
+            line = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", line).rstrip()
+            if line:
+                self.output.append(clean(line))
+
+    def stop(self):
+        if self.proc.poll() is None:
+            try:
+                os.killpg(self.proc.pid, signal.SIGTERM)
+                self.proc.wait(5)
+            except subprocess.TimeoutExpired:
+                os.killpg(self.proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+APPS, APPS_LOCK = {}, threading.Lock()
+
+def start_app(project):
+    if not isinstance(project["run"], str) or not project["run"].strip():
+        return 400, {"error": 'This project has no "run" command in projects.json.'}
+    with APPS_LOCK:
+        app = APPS.get(project["id"])
+        if app and app.proc.poll() is None:
+            return 200, {"ok": True}
+        port = project["port"] if isinstance(project["port"], int) else None
+        if port and listening(port):
+            return 409, {"error": f"Something is already running on port {port}."}
+        try:
+            APPS[project["id"]] = App(project)
+        except (OSError, ValueError) as e:
+            return 500, {"error": f"Couldn't run it: {e}"}
+    return 200, {"ok": True}
+
+def stop_app(project):
+    with APPS_LOCK:
+        app = APPS.get(project["id"])
+    if app and app.proc.poll() is not None:
+        return 200, {"ok": True}
+    if not app:
+        return 409, {"error": "It wasn't started from here, so it's left running."}
+    app.stop()
+    return 200, {"ok": True}
+
+@atexit.register
+def stop_apps():
+    for app in list(APPS.values()):
+        app.stop()
 
 def project_list():
     out = []
@@ -103,14 +201,24 @@ def project_list():
         counts = {}
         for a in snap["agents"]:
             counts[a["status"]] = counts.get(a["status"], 0) + 1
-        port = p["port"] if isinstance(p["port"], int) else guess_port(p["root"])
+        served = serve_app(p) if isinstance(p["serve"], str) else None
+        port = served or (p["port"] if isinstance(p["port"], int) else guess_port(p["root"]))
+        page = str(p["page"] or "").lstrip("/")
+        app = APPS.get(p["id"])
         out.append({"id": p["id"], "name": p["name"], "found": (p["root"] / ".sandcastle").is_dir(),
+                    "runnable": isinstance(p["run"], str) and bool(p["run"].strip()),
+                    "started": bool(app) and app.proc.poll() is None,
+                    "exitCode": app.proc.poll() if app else None,
+                    "output": list(app.output)[-30:] if app else [],
                     "counts": counts, "branches": len(snap["branches"]),
                     "path": str(p["root"]).replace(str(Path.home()), "~", 1),
                     "description": p["description"] if isinstance(p["description"], str) else describe(p["root"]),
-                    "port": port, "portGuessed": not isinstance(p["port"], int) and port is not None,
+                    "port": port, "portGuessed": not served and not isinstance(p["port"], int) and port is not None,
+                    "served": str(p["serve"]) if served else None,
+                    "unbuilt": isinstance(p["serve"], str) and not served,
                     "running": bool(port) and listening(port),
-                    "url": p["url"] if isinstance(p["url"], str) else (f"http://localhost:{port}" if port else None)})
+                    "url": f"http://localhost:{port}/{page}" if served else
+                           p["url"] if isinstance(p["url"], str) else (f"http://localhost:{port}/{page}" if port else None)})
     return {"projects": out}
 
 def file_issue(project, title, body):
@@ -171,7 +279,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
-        if urlsplit(self.path).path != "/api/issues":
+        path = urlsplit(self.path).path
+        if path not in ("/api/issues", "/api/apps/start", "/api/apps/stop"):
             self.send_error(404)
             return
         # Only from this page: another site open in the browser can't send JSON here without asking
@@ -183,12 +292,19 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             data = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length", 0)), 100_000)))
-            title, body = str(data["title"]).strip()[:200], str(data["body"])[:60_000]
             pid = str(data["project"])
+            if path == "/api/issues":
+                title, body = str(data["title"]).strip()[:200], str(data["body"])[:60_000]
         except (ValueError, KeyError, TypeError):
             self.send_json(400, {"error": "Bad request."})
             return
         project = next((p for p in load_projects() if p["id"] == pid), None)
+        if path != "/api/issues":
+            if not project:
+                self.send_json(400, {"error": "No such project."})
+            else:
+                self.send_json(*(start_app if path == "/api/apps/start" else stop_app)(project))
+            return
         if not project or not title:
             self.send_json(400, {"error": "Pick a project and give the issue a title."})
             return
@@ -239,4 +355,9 @@ if __name__ == "__main__":
     print(f"Sandcastle Pixel Office: http://127.0.0.1:{port}", flush=True)
     for p in load_projects():
         print(f"Project {p['id']}: {p['root'] / '.sandcastle' / 'logs'}", flush=True)
-    ThreadingHTTPServer(("127.0.0.1",port),Handler).serve_forever()
+    # Stopped by a signal, it still stops the apps it started on the way out.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    try:
+        ThreadingHTTPServer(("127.0.0.1",port),Handler).serve_forever()
+    except KeyboardInterrupt:
+        pass

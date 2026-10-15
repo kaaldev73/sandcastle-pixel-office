@@ -1,12 +1,13 @@
-import { fileIssue, type ProjectSummary } from './api';
+import { fileIssue, startApp, stopApp, type ProjectSummary } from './api';
 import { GAMES, type RetroArcade } from './games/arcade';
 import { STATUS_BULB } from './vendor/agent-office/character/agent';
 
 // The CEO's computer, sat at up close: a retro desktop filling the screen, with a Games folder (the
-// arcade), a Projects folder (each app, what it's for and the port it runs on), and a notepad for
-// writing an issue (what's wrong and what you want), kept as a draft or filed on GitHub for the Planner.
+// arcade), a Projects folder (each app, what it's for and the port it runs on), a shortcut to each app
+// (run and stopped from here, and opened in a window here once it's up), and a notepad for writing an issue (what's wrong and what
+// you want), kept as a draft or filed on GitHub for the Planner.
 
-type View = 'desktop' | 'games' | 'game' | 'projects' | 'issue';
+type View = 'desktop' | 'games' | 'game' | 'projects' | 'issue' | 'app';
 
 const TITLES: Record<View, string> = {
   desktop: '',
@@ -14,6 +15,7 @@ const TITLES: Record<View, string> = {
   game: '🕹️ ',
   projects: '📁 Projects',
   issue: '📝 New issue',
+  app: '🖥️ ',
 };
 const DRAFTS_KEY = 'pixel-office.issues';
 const TABS = ['#e63946', '#457b9d', '#f4a261', '#2a9d8f', '#9d4edd', '#e9c46a', '#ff8fab', '#264653'];
@@ -53,6 +55,10 @@ export class Computer {
   /** The draft the form is editing, if it's been saved. */
   private editing: string | null = null;
   private clock = 0;
+  private poll = 0;
+  /** The project whose app the app window shows, and why it couldn't run it, if it couldn't. */
+  private appId: string | null = null;
+  private appError = '';
 
   constructor(
     private arcade: RetroArcade,
@@ -65,6 +71,8 @@ export class Computer {
     }
     for (const b of document.querySelectorAll<HTMLElement>('[data-open]')) b.onclick = () => this.open(b.dataset.open as View);
     $('pc-win-close').onclick = () => this.back();
+    $('pc-win-stop').onclick = () => this.appId && void this.stop(this.appId);
+    $('pc-app-run').onclick = () => this.appId && void this.run(this.appId);
     $('pc-off').onclick = () => this.onLeave();
     $('pc-full').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
     $('issue-save').onclick = () => this.save();
@@ -82,25 +90,39 @@ export class Computer {
     this.open('desktop');
     this.tick();
     this.clock = window.setInterval(() => this.tick(), 10_000);
+    // While an app's starting up, keep asking whether it's up yet.
+    this.poll = window.setInterval(() => this.desk.projects().some((p) => p.started && !p.running) && this.desk.refresh(), 1000);
   }
 
   hide() {
     this.arcade.hide();
     $('pc').hidden = true;
     clearInterval(this.clock);
+    clearInterval(this.poll);
   }
 
-  open(view: View, gameId?: string) {
+  /** Opens a window: a game or a project's app by id, for those. */
+  open(view: View, id?: string) {
     if (this.view === 'game' && view !== 'game') this.arcade.hide();
+    // Closing an app's window unloads it, as closing it would.
+    if (view !== 'app') this.load(null);
     this.view = view;
+    $('pc-win-stop').hidden = true;
+    $('pc-win-out').hidden = true;
     $('pc-win').hidden = view === 'desktop';
-    for (const v of ['games', 'game', 'projects', 'issue'] as const) $(`pc-${v}`).hidden = v !== view;
-    const game = GAMES.find((g) => g.id === gameId);
-    $('pc-win-title').textContent = TITLES[view] + (view === 'game' && game ? game.name : '');
+    for (const v of ['games', 'game', 'projects', 'issue', 'app'] as const) $(`pc-${v}`).hidden = v !== view;
+    const game = GAMES.find((g) => g.id === id);
+    const app = this.desk.projects().find((p) => p.id === id);
+    $('pc-win-title').textContent = TITLES[view] + (view === 'game' && game ? game.name : view === 'app' && app ? app.name : '');
     $('pc-task').textContent = view === 'desktop' ? '' : $('pc-win-title').textContent;
     if (view === 'game' && game) {
       this.arcade.play(game.id);
       this.arcade.show();
+    } else if (view === 'app' && app) {
+      this.appId = app.id;
+      this.drawApp();
+    } else if (view === 'desktop') {
+      this.drawShortcuts();
     } else if (view === 'projects') {
       this.drawProjects();
       this.desk.refresh();
@@ -122,12 +144,86 @@ export class Computer {
 
   /** The projects changed (they're fetched every few seconds): redraws what shows them. */
   refresh() {
-    if (this.view === 'projects') this.drawProjects();
+    this.drawShortcuts();
+    if (this.view === 'app') this.drawApp();
+    else if (this.view === 'projects') this.drawProjects();
     else if (this.view === 'issue') this.drawProjectChoice();
   }
 
   private tick() {
     $('pc-clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  /** A desktop icon for each project's app that's up or can be run from here: opening it runs it if need be. */
+  private drawShortcuts() {
+    const box = $('pc-shortcuts');
+    const apps = this.desk.projects().filter((p) => p.runnable || (p.running && p.url));
+    const key = apps.map((p) => `${p.id}:${p.running}`).join();
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    box.innerHTML = '';
+    for (const p of apps) {
+      const b = el('button', `icon${p.running ? '' : ' off'}`);
+      b.append(el('span', 'glyph', '🖥️'), el('span', 'name', p.name));
+      b.title = p.running ? `${p.name}: running on port ${p.port}` : `${p.name}: not running (opening it runs it)`;
+      b.onclick = () => (p.running || p.started ? this.open('app', p.id) : void this.run(p.id));
+      box.append(b);
+    }
+  }
+
+  /** The app window: the app once it's up; till then, how it's getting on, and what its server's printed. */
+  private drawApp() {
+    const p = this.desk.projects().find((o) => o.id === this.appId);
+    if (!p) return;
+    const up = p.running && !!p.url;
+    $('pc-win-stop').hidden = !p.started;
+    $('pc-win-out').hidden = !up;
+    if (up) $<HTMLAnchorElement>('pc-win-out').href = p.url!;
+    $('pc-app-boot').hidden = up;
+    $('pc-app-frame').hidden = !up;
+    this.load(up ? p.url : null);
+    if (up) return;
+    $('pc-app-state').textContent = this.appError
+      ? `Couldn’t run ${p.name}: ${this.appError}`
+      : p.started
+        ? `Starting ${p.name}…`
+        : p.exitCode !== null && ![0, -15, 143].includes(p.exitCode)
+          ? `${p.name} stopped (exit code ${p.exitCode})`
+          : `${p.name} isn’t running`;
+    $('pc-app-run').hidden = !p.runnable || p.started;
+    const feed = $('pc-app-output');
+    feed.innerHTML = '';
+    for (const line of p.output.length ? p.output : [p.runnable ? 'Its server’s output shows here.' : 'Start it outside, or give it "run" in projects.json to run it from here.']) feed.append(el('div', '', line));
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  /** Points the app window at `url` (or nothing), only if it isn't there already: reloading would lose your place. */
+  private load(url: string | null) {
+    const frame = $<HTMLIFrameElement>('pc-app-frame');
+    if ((frame.dataset.url ?? null) === url) return;
+    if (url) frame.dataset.url = url;
+    else delete frame.dataset.url;
+    frame.src = url ?? 'about:blank';
+  }
+
+  private async run(id: string) {
+    this.appError = '';
+    try {
+      await startApp(id);
+    } catch (e) {
+      this.appError = (e as Error).message;
+    }
+    this.open('app', id);
+    this.desk.refresh();
+  }
+
+  private async stop(id: string) {
+    try {
+      await stopApp(id);
+    } catch (e) {
+      this.appError = (e as Error).message;
+    }
+    this.desk.refresh();
   }
 
   private drawGames() {
@@ -159,7 +255,9 @@ export class Computer {
 
       const port = el('div', 'port');
       const dot = el('i', `dot ${p.running ? 'up' : 'down'}`);
-      if (p.port) {
+      if (p.served && p.port) port.append(dot, el('span', '', `Running on port ${p.port} · its built ${p.served}/ folder`));
+      else if (p.unbuilt) port.append(dot, el('span', 'muted', 'Not built yet: run its build, then it opens here'));
+      else if (p.port) {
         const where = p.running ? `Running on port ${p.port}` : `Not running · ${p.portGuessed ? 'usually' : 'set to'} port ${p.port}`;
         port.append(dot, el('span', '', where + (p.portGuessed && p.running ? ' (guessed from its dev script)' : '')));
       } else port.append(dot, el('span', 'muted', 'No port known: add "port" in projects.json'));
@@ -175,8 +273,23 @@ export class Computer {
       if (!p.found) counts.append(el('span', '', 'no .sandcastle folder'));
 
       const acts = el('div', 'acts');
+      if (p.runnable && !p.started && !p.running) {
+        const run = el('button', 'primary', '▶ Run');
+        run.onclick = () => void this.run(p.id);
+        acts.append(run);
+      } else if (p.started) {
+        const stop = el('button', '', '■ Stop');
+        stop.onclick = () => void this.stop(p.id);
+        acts.append(stop);
+      }
+      if (p.started && !p.running) acts.append(el('span', 'muted small', 'Starting…'));
+      if (p.url && p.running) {
+        const here = el('button', 'primary', '▶ Open here');
+        here.onclick = () => this.open('app', p.id);
+        acts.append(here);
+      }
       if (p.url) {
-        const open = el('a', `btn${p.running ? ' primary' : ''}`, p.running ? 'Open app ↗' : 'Try opening ↗');
+        const open = el('a', 'btn', p.running ? 'New tab ↗' : 'Try opening ↗');
         open.href = p.url;
         open.target = '_blank';
         open.rel = 'noopener';

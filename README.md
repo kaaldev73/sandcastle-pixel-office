@@ -2,7 +2,7 @@
 
 A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-dev/sandcastle) agent activity. In V3 you make your own CEO and walk round a 3D office, in first or third person: the **Planner**, **Implementer**, **Reviewer**, and **Merger** each have a cubicle where they act out their status, with their log on the wall, and the file stack in the CEO's room switches between your Sandcastle projects. The V2 pixel-art dashboard is still at `/2d`.
 
-> **Local monitor.** Pixel Office does not start, stop, schedule, or control agents. It displays information already written by your Sandcastle project. The one thing it writes is a GitHub issue, and only when you file one from the CEO's computer.
+> **Local monitor.** Pixel Office does not start, stop, schedule, or control agents. It displays information already written by your Sandcastle project. From the CEO's computer you can file a GitHub issue, and run and stop a project's app with the command you gave it in `projects.json`.
 
 ## Features
 
@@ -14,7 +14,7 @@ A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-
 - A lounge with windows onto a beach, the sea, woods and mountains
 - A retro computer on the CEO's desk: sit in the CEO's chair and press **E**, and its desktop fills the screen:
   - **Games**: Tetris, Snake, Invaders, Breakout and Pong, with high scores kept in your browser
-  - **Projects**: each app, what it's for, the port it runs on and whether it's up, with a link to open it
+  - **Projects**: each app, what it's for, the port it runs on and whether it's up, with **Run** and **Stop** for its dev server; it opens in a window on the computer once it's up, or in a new tab
   - **New issue**: write what's wrong and what you want, then save it as a draft or file it as a GitHub issue (with `gh`, in the project's folder) for the Planner to pick up
 - Agent status: waiting, working, done, idle, or error, refreshed every **3 seconds**
 - V2 pixel-art dashboard at `/2d`, with recent logs, worktree names and overview counts
@@ -69,6 +69,10 @@ To watch several projects, copy `projects.example.json` to `projects.json` and l
 ```
 
 Each project can also have a `"description"` (what the app is for), a `"port"` (where it runs) and a `"url"` (where to open it), for the Projects folder on the CEO's computer. Without them it reads the description from the project's `package.json` or README, and guesses the port from its dev scripts (Vite's 5173 if nothing says).
+
+To run and stop a project's app from the CEO's computer, give it `"run"`, the command that starts its server (run in the project's folder, without a shell), with the `"port"` it listens on, and `"page"` if its page isn't at `/`. For a Vite app, pin the port so it can't wander off to another: `"run": "npm run dev -- --port 5173 --strictPort", "port": 5173`. Its output shows on the computer while it starts, and once it's listening it opens in a window there (and gets a desktop icon). Apps started this way stop when you press **Stop** or stop Pixel Office; one already running from elsewhere is left alone.
+
+Or, for an app with nothing to run, give it `"serve"`: its built folder (say `"dist"`), and `"page"` if the app's page isn't that folder's `index.html`. Pixel Office serves the folder, read-only, on a local port of its own (its `"port"`, or one worked out from its id), and the app gets a desktop icon. The port stays the same between runs because the browser keeps what the app saves for each port separately. A Chrome extension opened this way runs as a plain page: whatever needs Chrome's extension features won't work, and it keeps its own data, apart from the installed extension's.
 
 Filing an issue from the computer needs the [GitHub CLI](https://cli.github.com/) installed and logged in (`gh auth login`).
 
