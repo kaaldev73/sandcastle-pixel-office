@@ -4,6 +4,21 @@ A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-
 
 > **Local monitor.** Pixel Office does not start, stop, schedule, or control agents. It displays information already written by your Sandcastle project. From the CEO's computer you can file a GitHub issue, and run and stop a project's app with the command you gave it in `projects.json`.
 
+![The hallway: each agent's cubicle, with its status over its desk](screenshots/v3-hallway.png)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![The Reviewer at its desk, done](screenshots/v3-cubicle.png) | ![The lounge, with windows onto the beach and the woods](screenshots/v3-lounge.png) |
+| **An agent at work.** Each one acts out its status at its desk, with its log on the wall. | **The lounge.** Done or idle agents wander off here, to the sofa and the view. |
+| ![Create your CEO](screenshots/v3-create-ceo.png) | ![Projects on the CEO's computer, with an app running](screenshots/v3-projects.png) |
+| **Create your CEO.** Skin, hair, style and shirt, then walk in. | **Projects.** Each app, what it's for and its port, with Run, Stop, Watch in office and On my screen. |
+| ![An app open on the CEO's computer](screenshots/v3-app-in-office.png) | ![New issue, written up by Claude](screenshots/v3-new-issue.png) |
+| **Watch in office.** A running app opens in a window on the computer. | **New issue.** Write a note and Claude writes it up as a full issue, then file it on GitHub. |
+| ![Tetris on the computer](screenshots/v3-tetris.png) | ![The V2 pixel-art dashboard](screenshots/pixel-office-v2.png) |
+| **Games.** Tetris, Snake, Invaders, Breakout and Pong. | **V2 dashboard**, still at `/2d`. |
+
 ## Features
 
 - 3D office: create your CEO, then walk with **WASD** and look with the mouse, in first person or third (**V** switches, the mouse wheel zooms)
@@ -184,7 +199,9 @@ You only need Node to change the 3D office. Run `npm install`, start `python3 se
 
 Special thanks to **[Matt Pocock](https://github.com/mattpocock)** for his work on Sandcastle and for inspiring this pixel-art view of the agent workflow.
 
-Thanks to **K¥Ø** and to **[agent-office](https://github.com/AgentSystemLabs/agent-office)** by AgentSystemLabs for the V3 3D office. Its characters, movement and materials are adapted from agent-office (MIT License); see `THIRD_PARTY_NOTICES.md`.
+Thanks to **K¥Ø** for inspiring me to build this.
+
+Thanks to **[agent-office](https://github.com/AgentSystemLabs/agent-office)** by AgentSystemLabs: the V3 3D office's characters, movement and materials are adapted from it (MIT License); see `THIRD_PARTY_NOTICES.md`.
 
 ## Contributing
 
