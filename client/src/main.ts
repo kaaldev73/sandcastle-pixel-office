@@ -209,7 +209,6 @@ function choose(id: string) {
 const computer = new Computer(arcade, {
   projects: () => projects,
   current: () => current,
-  choose,
   refresh: () => void loadProjects(),
 });
 computer.onLeave = () => closeModal();

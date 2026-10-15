@@ -4,8 +4,8 @@
 It only reads Sandcastle's logs: it never starts or stops agents. From the CEO's computer you can file
 a GitHub issue (with `gh`, in that project's folder), and run and stop a project's app with the command
 projects.json gives it (its "run"). A project can also have its built app served (read-only, on a port
-of its own). An app it runs opens on your own screen, in your normal browser, once it's up. Apps it
-started are stopped when it stops."""
+of its own), and opened on your own screen, in your normal browser. Apps it started are stopped when
+it stops."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 import json, re, time, os, sys, mimetypes, socket, subprocess, threading, zlib, shlex, signal, atexit, webbrowser
@@ -176,21 +176,10 @@ def start_app(project):
         if port and listening(port):
             return 409, {"error": f"Something is already running on port {port}."}
         try:
-            app = APPS[project["id"]] = App(project)
+            APPS[project["id"]] = App(project)
         except (OSError, ValueError) as e:
             return 500, {"error": f"Couldn't run it: {e}"}
-    threading.Thread(target=show_when_up, args=(app, project), daemon=True).start()
     return 200, {"ok": True}
-
-def show_when_up(app, project, wait=180):
-    """Opens a just-started app on the CEO's own screen once its server's listening (or gives up when it exits)."""
-    port, url = app_address(project)
-    end = time.time() + wait
-    while port and url and app.proc.poll() is None and time.time() < end:
-        if listening(port):
-            webbrowser.open(url)
-            return
-        time.sleep(0.5)
 
 def show_on_screen(project):
     """Opens the project's app in the CEO's normal browser, on their own screen, outside wherever the office is."""
