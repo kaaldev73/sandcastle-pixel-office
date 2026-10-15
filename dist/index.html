@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Sandcastle • Pixel Office</title>
     <link rel="icon" href="data:," />
-    <script type="module" crossorigin src="/static/index-B4gaLgJI.js"></script>
+    <script type="module" crossorigin src="/static/index-b4lNOQmO.js"></script>
     <link rel="stylesheet" crossorigin href="/static/index-1NcL8dIC.css">
   </head>
   <body>
@@ -87,6 +87,7 @@
                 <span class="spacer"></span>
                 <button type="button" id="issue-save">💾 Save draft</button>
                 <button type="button" id="issue-file" class="primary">File on GitHub</button>
+                <button type="button" id="issue-sandcastle">🏰 Start Sandcastle</button>
               </div>
               <p class="muted small" id="issue-said"></p>
             </form>
@@ -95,7 +96,7 @@
               <textarea id="issue-body" spellcheck="false" placeholder="Press ✨ Write it up: Claude reads the project and turns your note into a full issue here (objective, numbered sections, tests, acceptance criteria), for you to read over and edit. Leave it empty to file your note as it is."></textarea>
               <h3>Saved issues</h3>
               <div id="issue-drafts" class="drafts"></div>
-              <p class="muted small">Filing opens a GitHub issue on the project's repo with <code>gh</code>, labelled Sandcastle. Sandcastle's Planner picks up open issues on its next run.</p>
+              <p class="muted small">Filing opens a GitHub issue on the project's repo with <code>gh</code>, labelled Sandcastle. If the project has a <code>"sandcastle"</code> command in projects.json, filing starts Sandcastle on it now (unless it's running already); otherwise the Planner picks it up on its next run.</p>
             </aside>
           </div>
         </div>

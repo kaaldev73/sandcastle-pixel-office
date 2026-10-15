@@ -2,7 +2,7 @@
 
 A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-dev/sandcastle) agent activity. In V3 you make your own CEO and walk round a 3D office, in first or third person: the **Planner**, **Implementer**, **Reviewer**, and **Merger** each have a cubicle where they act out their status, with their log on the wall, and the file stack in the CEO's room switches between your Sandcastle projects. The V2 pixel-art dashboard is still at `/2d`.
 
-> **Local monitor.** Pixel Office does not start, stop, schedule, or control agents. It displays information already written by your Sandcastle project. From the CEO's computer you can file a GitHub issue, and run and stop a project's app with the command you gave it in `projects.json`.
+> **Local monitor.** Pixel Office shows what your Sandcastle agents are doing from the logs they write. From the CEO's computer you can file a GitHub issue, which starts Sandcastle on it straight away if you give the project a `"sandcastle"` command in `projects.json`, and run and stop a project's app with its `"run"` command.
 
 ![The hallway: each agent's cubicle, with its status over its desk](screenshots/v3-hallway.png)
 
@@ -89,6 +89,8 @@ To run and stop a project's app from the CEO's computer, give it `"run"`, the co
 
 Or, for an app with nothing to run, give it `"serve"`: its built folder (say `"dist"`), and `"page"` if the app's page isn't that folder's `index.html`. Pixel Office serves the folder, read-only, on a local port of its own (its `"port"`, or one worked out from its id). The port stays the same between runs because the browser keeps what the app saves for each port separately. A Chrome extension opened this way runs as a plain page: whatever needs Chrome's extension features won't work, and it keeps its own data, apart from the installed extension's.
 
+To have Sandcastle start as soon as you file an issue, give the project `"sandcastle"`, the command that starts it (run in the project's folder, without a shell), say `"sandcastle": "npm run sandcastle"`. Filing then starts it, so the Planner picks your issue up now, unless Sandcastle is already running in that folder (from here or a terminal of yours), in which case it picks it up next round. Its card in **Projects** shows whether it's running and what it printed last, with **Start Sandcastle** and **Stop Sandcastle**; the same button is on **New issue**, next to **File on GitHub**, for the project picked there. A run started this way stops when you press **Stop Sandcastle** or stop Pixel Office. It's given your GitHub CLI login as `GH_TOKEN` (unless that's set already), for Sandcastle to pass into its Docker sandboxes. Each run starts Docker sandboxes and uses your Claude plan.
+
 Filing an issue from the computer needs the [GitHub CLI](https://cli.github.com/) installed and logged in (`gh auth login`). **Write it up** also needs [Claude Code](https://claude.com/claude-code) installed and logged in (`claude`); it runs headless in the project's folder, can only read files there, and uses your Claude plan.
 
 #### Several projects at once
@@ -141,7 +143,7 @@ Then open **http://127.0.0.1:9000**.
 
 ### 4. Run Sandcastle separately
 
-Run Sandcastle from its own project terminal using that project's documented startup command. The dashboard will detect matching log updates automatically; you do **not** need to launch agents from Pixel Office.
+Run Sandcastle from its own project terminal using that project's documented startup command, or give the project `"sandcastle"` in `projects.json` to have Pixel Office start it when you file an issue. The dashboard will detect matching log updates automatically either way.
 
 ## How monitoring works
 
@@ -154,7 +156,7 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 ## Privacy and security
 
 - The server binds to **127.0.0.1** by default; it is intended for local use only.
-- Pixel Office reads logs and worktree names; it does not modify your Sandcastle project or execute agent commands.
+- Pixel Office reads logs and worktree names. It runs agent commands only where you've given a project `"sandcastle"` in `projects.json`, when you file an issue or press **Start Sandcastle**.
 - The server applies best-effort redaction to some token and password patterns, but **redaction is not comprehensive**. Agent logs may still reveal private paths, prompts, code, or other sensitive information.
 - Do not expose the local server to the public internet or share live logs without reviewing them.
 - Do not commit secrets or copied agent logs to this repository.
@@ -169,6 +171,24 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 
 **No worktrees appear:** Check whether your project creates `.sandcastle/worktrees/`. Missing or empty directories are shown as no worktrees.
 
+### Starting Sandcastle from the office
+
+**Sandcastle stops with `PromptError` and `exitCode: 4`, and the Planner's log says `gh` wants `gh auth login`:** The Planner runs in a Docker sandbox, which can't use the GitHub login stored in your computer's keyring, so `gh issue list` fails in there. Sandcastle passes GitHub access into the sandbox only if `GH_TOKEN` is set when it starts. Pixel Office sets it from `gh auth token` for runs it starts, so check that `gh` is logged in on your computer (`gh auth status`; if not, `gh auth login`), then stop and start Pixel Office so it has the change. Started from a terminal, run it as `GH_TOKEN=$(gh auth token) npm run sandcastle`.
+
+**`GH_TOKEN=$(gh auth token) ...` doesn't work as the `"sandcastle"` command:** Pixel Office runs commands without a shell, so `$(...)` isn't expanded. Use just `"sandcastle": "npm run sandcastle"`: Pixel Office adds `GH_TOKEN` itself.
+
+**The Planner still shows *error* after you've fixed something:** Its status comes from its newest log, which is still the failed run's. Start Sandcastle again (**Start Sandcastle** in **Projects**, or file an issue) and it changes once the new run writes to the log.
+
+**Filing an issue doesn't start Sandcastle:** Check the project has `"sandcastle"` in `projects.json`, and reload the office page. If the message says Sandcastle is already running, it found a Sandcastle process in that project's folder (perhaps one you started in a terminal): that run picks up the issue at the start of its next round. Pixel Office won't start a second one alongside it.
+
+**The card says "Sandcastle stopped (exit code ...)":** Its last lines show on the card; the agent logs in `.sandcastle/logs/` have the rest. Check that Docker is running (`docker ps`) and that the project's `.sandcastle/.env` has the Claude token Sandcastle needs.
+
+**Sandcastle ran but did nothing:** The Planner found no open, unblocked issues and stopped (`No unblocked issues to work on`). Check the issue is open on the repo Sandcastle reads (`gh issue list`, in the project's folder).
+
+**"Couldn't start Sandcastle":** The `"sandcastle"` command couldn't be run: check it's right and works when you run it yourself in the project's folder.
+
+**A project's agents all show *waiting*:** Check its `"path"` in `projects.json` still exists. A folder under `/tmp` is gone after a restart.
+
 ## Project files
 
 | File | Purpose |
@@ -179,7 +199,7 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 | `client/src/vendor/agent-office/` | Parts adapted from agent-office (MIT), see `THIRD_PARTY_NOTICES.md` |
 | `dist/` | The built 3D office, committed so `python3 server.py` needs no Node |
 | `index.html` | V2 dashboard UI, pixel-art visuals, and client-side polling |
-| `server.py` | Local HTTP server and read-only log/worktree status endpoints |
+| `server.py` | Local HTTP server: log/worktree status, filing issues, and starting apps and Sandcastle |
 | `projects.example.json` | Example list of projects for the CEO's file stack |
 | `.gitignore` | Excludes Python cache, local environment files, `projects.json` and `node_modules/` |
 

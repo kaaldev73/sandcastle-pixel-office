@@ -1,11 +1,11 @@
-import { fileIssue, showOnScreen, startApp, stopApp, writeUp, type IssueKind, type ProjectSummary } from './api';
+import { fileIssue, showOnScreen, startApp, startSandcastle, stopApp, stopSandcastle, writeUp, type IssueKind, type ProjectSummary } from './api';
 import { GAMES, type RetroArcade } from './games/arcade';
 import { STATUS_BULB } from './vendor/agent-office/character/agent';
 
 // The CEO's computer, sat at up close: a retro desktop filling the screen, with a Games folder (the
 // arcade), a Projects folder (each app, what it's for and the port it runs on), a shortcut to each app
 // (run and stopped from here, and opened in a window here once it's up), and a notepad for writing an issue (what's wrong and what
-// you want), kept as a draft or filed on GitHub for the Planner.
+// you want), kept as a draft or filed on GitHub for the Planner: filing it starts Sandcastle, unless it's running.
 
 type View = 'desktop' | 'games' | 'game' | 'projects' | 'issue' | 'app';
 
@@ -88,6 +88,11 @@ export class Computer {
     $('issue-file').onclick = () => void this.file();
     $('issue-write').onclick = () => void this.writeUp();
     $('issue-new').onclick = () => this.edit(null);
+    $('issue-sandcastle').onclick = () => {
+      const p = this.desk.projects().find((o) => o.id === $<HTMLSelectElement>('issue-project').value);
+      if (p) void this.sandcastle(p.id, !p.sandcastleStarted);
+    };
+    $('issue-project').onchange = () => this.drawSandcastle();
     $<HTMLFormElement>('pc-issue-form').onsubmit = (e) => e.preventDefault();
     this.drawGames();
   }
@@ -155,7 +160,19 @@ export class Computer {
   refresh() {
     if (this.view === 'app') this.drawApp();
     else if (this.view === 'projects') this.drawProjects();
-    else if (this.view === 'issue') this.drawProjectChoice();
+    else if (this.view === 'issue') {
+      this.drawProjectChoice();
+      this.drawSandcastle();
+    }
+  }
+
+  /** The New issue form's Sandcastle button, for the project picked: Start, or Stop if a run started from here is going. */
+  private drawSandcastle() {
+    const p = this.desk.projects().find((o) => o.id === $<HTMLSelectElement>('issue-project').value);
+    const btn = $<HTMLButtonElement>('issue-sandcastle');
+    btn.textContent = p?.sandcastleStarted ? '■ Stop Sandcastle' : '🏰 Start Sandcastle';
+    btn.disabled = !p?.sandcastle;
+    btn.title = p?.sandcastle ? 'Have the Planner pick up the open issues now' : 'Give this project "sandcastle" in projects.json first';
   }
 
   private tick() {
@@ -231,6 +248,16 @@ export class Computer {
     this.desk.refresh();
   }
 
+  private async sandcastle(id: string, start: boolean) {
+    try {
+      if (!start) await stopSandcastle(id);
+      else if ((await startSandcastle(id)).sandcastle === 'running') alert('Sandcastle is already running there: it picks up open issues next round.');
+    } catch (e) {
+      alert((e as Error).message);
+    }
+    this.desk.refresh();
+  }
+
   private drawGames() {
     const box = $('pc-games');
     box.innerHTML = '';
@@ -277,6 +304,19 @@ export class Computer {
       }
       if (!p.found) counts.append(el('span', '', 'no .sandcastle folder'));
 
+      const sc = el('div', 'port');
+      if (p.sandcastleStarted) sc.append(el('i', 'dot up'), el('span', '', 'Sandcastle is running, started from here'));
+      else if (p.sandcastleExitCode !== null && ![0, -15, 143].includes(p.sandcastleExitCode))
+        sc.append(el('i', 'dot down'), el('span', '', `Sandcastle stopped (exit code ${p.sandcastleExitCode})`));
+      else if (p.sandcastle) sc.append(el('i', 'dot down'), el('span', 'muted', 'Sandcastle starts when you file an issue'));
+      else sc.append(el('i', 'dot down'), el('span', 'muted', 'Give it "sandcastle" in projects.json to start Sandcastle when you file an issue'));
+      card.append(sc);
+      if (p.sandcastleOutput.length) {
+        const feed = el('div', 'feed');
+        for (const line of p.sandcastleOutput) feed.append(el('div', '', line));
+        card.append(feed);
+      }
+
       const acts = el('div', 'acts');
       if (p.runnable && !p.started && !p.running) {
         const run = el('button', 'primary', '▶ Run');
@@ -300,11 +340,22 @@ export class Computer {
         out.onclick = () => void this.toScreen(p.id);
         acts.append(out);
       }
+      if (p.sandcastle && !p.sandcastleStarted) {
+        const go = el('button', '', '🏰 Start Sandcastle');
+        go.title = 'Have the Planner pick up its open issues now';
+        go.onclick = () => void this.sandcastle(p.id, true);
+        acts.append(go);
+      } else if (p.sandcastleStarted) {
+        const halt = el('button', '', '■ Stop Sandcastle');
+        halt.onclick = () => void this.sandcastle(p.id, false);
+        acts.append(halt);
+      }
       const issue = el('button', '', '📝 New issue');
       issue.onclick = () => {
         this.edit(null);
         this.open('issue');
         $<HTMLSelectElement>('issue-project').value = p.id;
+        this.drawSandcastle();
       };
       acts.append(issue);
       card.append(counts, acts);
@@ -360,6 +411,7 @@ export class Computer {
     $<HTMLButtonElement>('issue-write').disabled = !!filed || !!this.writing;
     $<HTMLButtonElement>('issue-write').textContent = this.writing ? '✨ Writing…' : '✨ Write it up';
     $<HTMLTextAreaElement>('issue-body').readOnly = writing;
+    this.drawSandcastle();
   }
 
   /** Loads a saved issue into the form, or (null) clears it for a new one. */
@@ -372,6 +424,7 @@ export class Computer {
     $<HTMLTextAreaElement>('issue-body').value = d?.body ?? '';
     this.kind = d?.kind ?? null;
     if (d) $<HTMLSelectElement>('issue-project').value = d.project;
+    this.drawSandcastle();
     this.say(d?.url ? `Filed: ${d.url}` : '');
     this.drawIssue();
   }
@@ -411,7 +464,8 @@ export class Computer {
     if (!project) return this.say('Pick a project.');
     if (!d.title) return this.say('Give it a title first.');
     if (!d.problem && !d.want && !d.body) return this.say('Say what’s wrong or what you want.');
-    if (!confirm(`File this as a GitHub issue on ${project.name}'s repo? The Planner picks up open issues on its next run.`)) return;
+    const then = project.sandcastle ? 'Sandcastle starts on it now, unless it’s running already.' : 'The Planner picks up open issues on its next run.';
+    if (!confirm(`File this as a GitHub issue on ${project.name}'s repo? ${then}`)) return;
     this.keep(d);
     const body = d.body ?? [d.problem && `## What's wrong\n\n${d.problem}`, d.want && `## What I want\n\n${d.want}`, `---\n_Filed from the CEO's computer in Sandcastle Pixel Office._`]
       .filter(Boolean)
@@ -420,9 +474,14 @@ export class Computer {
     btn.disabled = true;
     this.say('Filing on GitHub…');
     try {
-      d.url = await fileIssue(d.project, d.title, body, d.kind ?? null);
+      const r = await fileIssue(d.project, d.title, body, d.kind ?? null);
+      d.url = r.url;
       this.keep(d);
-      this.say(`Filed: ${d.url}`);
+      this.say(`Filed: ${d.url}. ` + (r.sandcastle === 'started' ? 'Sandcastle has started on it.'
+        : r.sandcastle === 'running' ? 'Sandcastle is already running: it picks it up next round.'
+        : r.sandcastleError ? `Couldn’t start Sandcastle: ${r.sandcastleError}`
+        : 'The Planner picks it up on its next run.'));
+      this.desk.refresh();
     } catch (e) {
       this.say(`Couldn’t file it (kept as a draft): ${(e as Error).message}`);
     }

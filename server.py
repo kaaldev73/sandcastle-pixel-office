@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Local Sandcastle Pixel Office. Python standard library only.
 
-It only reads Sandcastle's logs: it never starts or stops agents. From the CEO's computer you can file
-a GitHub issue (with `gh`, in that project's folder), written up first by Claude Code reading the project
-if you like, and run and stop a project's app with the command projects.json gives it (its "run"). A
+It reads Sandcastle's logs to show what the agents are doing. From the CEO's computer you can file a
+GitHub issue (with `gh`, in that project's folder), written up first by Claude Code reading the project
+if you like; filing it starts Sandcastle there (with its "sandcastle" command in projects.json), unless
+it's already running. You can also run and stop a project's app with its "run" command. A
 project can also have its built app served (read-only, on a port of its own), and opened on your own
-screen, in your normal browser. Apps it started are stopped when it stops."""
+screen, in your normal browser. Apps and Sandcastle runs it started are stopped when it stops."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 import json, re, time, os, sys, mimetypes, socket, subprocess, threading, zlib, shlex, signal, atexit, webbrowser
@@ -41,13 +42,14 @@ def load_projects():
                 seen.add(pid)
                 projects.append({"id": pid, "name": str(item.get("name") or path.name), "root": path,
                                  "description": item.get("description"), "port": item.get("port"), "url": item.get("url"),
-                                 "serve": item.get("serve"), "page": item.get("page"), "run": item.get("run")})
+                                 "serve": item.get("serve"), "page": item.get("page"), "run": item.get("run"),
+                                 "sandcastle": item.get("sandcastle")})
             if projects:
                 return projects
         except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
             print(f"Ignoring projects.json: {e}", file=sys.stderr, flush=True)
     return [{"id": DEFAULT_ROOT.name, "name": DEFAULT_ROOT.name, "root": DEFAULT_ROOT, "description": None,
-             "port": None, "url": None, "serve": None, "page": None, "run": None}]
+             "port": None, "url": None, "serve": None, "page": None, "run": None, "sandcastle": None}]
 
 def find_project(pid):
     projects = load_projects()
@@ -138,13 +140,14 @@ def serve_app(project):
         return SERVED[folder]
 
 class App:
-    """A project's app, started from the CEO's computer: its process and the last of what it printed."""
-    def __init__(self, project):
+    """A command run in a project's folder from the CEO's computer (its app's "run", or its "sandcastle"):
+    its process and the last of what it printed."""
+    def __init__(self, project, command, env=None):
         self.output = deque(maxlen=60)
         # Its own process group, so stopping it stops whatever it started too (npm starting vite, say).
-        self.proc = subprocess.Popen(shlex.split(project["run"]), cwd=project["root"], stdin=subprocess.DEVNULL,
+        self.proc = subprocess.Popen(shlex.split(command), cwd=project["root"], stdin=subprocess.DEVNULL,
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",
-                                     start_new_session=True, env={**os.environ, "BROWSER": "none", "FORCE_COLOR": "0"})
+                                     start_new_session=True, env={**os.environ, "BROWSER": "none", "FORCE_COLOR": "0", **(env or {})})
         threading.Thread(target=self.read, daemon=True).start()
 
     def read(self):
@@ -176,7 +179,7 @@ def start_app(project):
         if port and listening(port):
             return 409, {"error": f"Something is already running on port {port}."}
         try:
-            APPS[project["id"]] = App(project)
+            APPS[project["id"]] = App(project, project["run"])
         except (OSError, ValueError) as e:
             return 500, {"error": f"Couldn't run it: {e}"}
     return 200, {"ok": True}
@@ -202,9 +205,61 @@ def stop_app(project):
     app.stop()
     return 200, {"ok": True}
 
+RUNS, RUNS_LOCK = {}, threading.Lock()
+
+def sandcastle_elsewhere(project):
+    """Whether Sandcastle looks to be running in the project's folder already, started from somewhere else:
+    a process there whose command mentions sandcastle. (Linux only: elsewhere it can't tell.)"""
+    for proc in Path("/proc").glob("[0-9]*"):
+        try:
+            if int(proc.name) == os.getpid() or Path(os.readlink(proc / "cwd")).resolve() != project["root"]:
+                continue
+            if b"sandcastle" in (proc / "cmdline").read_bytes().lower():
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
+
+def github_token():
+    """The GitHub CLI's token, for Sandcastle to hand its Docker sandboxes (they can't reach the host's keyring),
+    as GH_TOKEN: unless it's set already, or gh isn't logged in."""
+    if os.environ.get("GH_TOKEN"):
+        return {}
+    try:
+        done = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    return {"GH_TOKEN": done.stdout.strip()} if done.returncode == 0 and done.stdout.strip() else {}
+
+def start_sandcastle(project):
+    """Starts Sandcastle in the project's folder with its "sandcastle" command, so its Planner picks up the
+    open issues now: unless it's running already, from here or elsewhere, when it picks them up next round."""
+    command = project["sandcastle"]
+    if not isinstance(command, str) or not command.strip():
+        return 400, {"error": 'This project has no "sandcastle" command in projects.json.'}
+    with RUNS_LOCK:
+        run = RUNS.get(project["id"])
+        if (run and run.proc.poll() is None) or sandcastle_elsewhere(project):
+            return 200, {"sandcastle": "running"}
+        try:
+            RUNS[project["id"]] = App(project, command, github_token())
+        except (OSError, ValueError) as e:
+            return 500, {"error": f"Couldn't start Sandcastle: {e}"}
+    return 200, {"sandcastle": "started"}
+
+def stop_sandcastle(project):
+    with RUNS_LOCK:
+        run = RUNS.get(project["id"])
+    if run and run.proc.poll() is not None:
+        return 200, {"ok": True}
+    if not run:
+        return 409, {"error": "It wasn't started from here, so it's left running."}
+    run.stop()
+    return 200, {"ok": True}
+
 @atexit.register
 def stop_apps():
-    for app in list(APPS.values()):
+    for app in [*APPS.values(), *RUNS.values()]:
         app.stop()
 
 def app_address(p):
@@ -225,12 +280,16 @@ def project_list():
             counts[a["status"]] = counts.get(a["status"], 0) + 1
         served = serve_app(p) if isinstance(p["serve"], str) else None
         port, url = app_address(p)
-        app = APPS.get(p["id"])
+        app, run = APPS.get(p["id"]), RUNS.get(p["id"])
         out.append({"id": p["id"], "name": p["name"], "found": (p["root"] / ".sandcastle").is_dir(),
                     "runnable": isinstance(p["run"], str) and bool(p["run"].strip()),
                     "started": bool(app) and app.proc.poll() is None,
                     "exitCode": app.proc.poll() if app else None,
                     "output": list(app.output)[-30:] if app else [],
+                    "sandcastle": isinstance(p["sandcastle"], str) and bool(p["sandcastle"].strip()),
+                    "sandcastleStarted": bool(run) and run.proc.poll() is None,
+                    "sandcastleExitCode": run.proc.poll() if run else None,
+                    "sandcastleOutput": list(run.output)[-8:] if run else [],
                     "counts": counts, "branches": len(snap["branches"]),
                     "path": str(p["root"]).replace(str(Path.home()), "~", 1),
                     "description": p["description"] if isinstance(p["description"], str) else describe(p["root"]),
@@ -266,7 +325,10 @@ def file_issue(project, title, body, kind=None):
     if done.returncode != 0:
         return 500, {"error": clean((done.stderr or done.stdout).strip() or f"gh exited with code {done.returncode}")}
     url = next((w for w in done.stdout.split() if w.startswith("https://")), done.stdout.strip())
-    return 200, {"url": url}
+    if not isinstance(project["sandcastle"], str) or not project["sandcastle"].strip():
+        return 200, {"url": url, "sandcastle": None}
+    code, started = start_sandcastle(project)
+    return 200, {"url": url, "sandcastle": started.get("sandcastle"), "sandcastleError": started.get("error")}
 
 WRITE_UP = """You turn a short note from the CEO into a GitHub issue for Sandcastle's coding agents, who plan and build
 from it. You're in the project's folder: read its README and code (Read, Grep, Glob) so the issue fits how the
@@ -385,7 +447,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
-        if path not in ("/api/issues", "/api/issues/write", "/api/apps/start", "/api/apps/stop", "/api/apps/screen"):
+        if path not in ("/api/issues", "/api/issues/write", "/api/apps/start", "/api/apps/stop", "/api/apps/screen",
+                        "/api/sandcastle/start", "/api/sandcastle/stop"):
             self.send_error(404)
             return
         # Only from this page: another site open in the browser can't send JSON here without asking
@@ -417,7 +480,8 @@ class Handler(BaseHTTPRequestHandler):
             if not project:
                 self.send_json(400, {"error": "No such project."})
             else:
-                act = {"/api/apps/start": start_app, "/api/apps/stop": stop_app, "/api/apps/screen": show_on_screen}[path]
+                act = {"/api/apps/start": start_app, "/api/apps/stop": stop_app, "/api/apps/screen": show_on_screen,
+                       "/api/sandcastle/start": start_sandcastle, "/api/sandcastle/stop": stop_sandcastle}[path]
                 self.send_json(*act(project))
             return
         if not project or not title:
