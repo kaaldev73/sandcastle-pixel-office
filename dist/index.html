@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sandcastle • Pixel Office</title>
+    <link rel="icon" href="data:," />
+    <script type="module" crossorigin src="/static/index-TfbT71h1.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/index-p4X9Rb2g.css">
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <section id="creator" class="panel creator" hidden>
+      <div class="eyebrow">Sandcastle HQ</div>
+      <h1>Create your CEO</h1>
+      <label class="field">Name <input id="ceo-name" maxlength="24" autocomplete="off" /></label>
+      <div class="field">Skin <div class="swatches" id="ceo-skin"></div></div>
+      <div class="field">Hair <div class="swatches" id="ceo-hair"></div></div>
+      <div class="field">Style <div class="chips" id="ceo-style"></div></div>
+      <div class="field">Shirt <div class="swatches" id="ceo-shirt"></div></div>
+      <div class="row">
+        <button id="ceo-random" class="ghost">🎲 Surprise me</button>
+        <button id="ceo-enter" class="primary">Enter the office →</button>
+      </div>
+      <p class="muted">Drag the preview to spin your CEO. Pixel Office only reads Sandcastle logs: it never starts or stops agents.</p>
+    </section>
+
+    <section id="hud" hidden>
+      <div class="panel status" id="status">
+        <div class="project"><span class="muted">📁</span> <strong id="project-name">…</strong></div>
+        <div class="agents" id="agent-dots"></div>
+        <div class="muted small" id="connection">Connecting…</div>
+      </div>
+      <div class="crosshair"></div>
+      <div class="hint" id="hint" hidden></div>
+      <div class="panel help" id="help">
+        <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · <b>Mouse</b> look · <b>E</b> use · <b>C</b> change CEO
+      </div>
+      <div class="click" id="click-to-look">Click to look around</div>
+    </section>
+
+    <section id="picker" class="panel modal" hidden>
+      <div class="modal-head"><h2>📁 Project files</h2><button class="ghost close" data-close>Esc ✕</button></div>
+      <p class="muted">Pick a Sandcastle project. The cubicles show its agents. Add projects in <code>projects.json</code>.</p>
+      <div id="project-list" class="list"></div>
+    </section>
+
+    <section id="log" class="panel modal" hidden>
+      <div class="modal-head"><h2 id="log-title">Log</h2><button class="ghost close" data-close>Esc ✕</button></div>
+      <div class="muted small" id="log-file"></div>
+      <div id="log-lines" class="feed"></div>
+    </section>
+
+  </body>
+</html>

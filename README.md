@@ -1,19 +1,18 @@
 # Sandcastle Pixel Office
 
-A lightweight, pixel-art dashboard for watching local [Sandcastle](https://github.com/ai-hero-dev/sandcastle) agent activity. Pixel Office gives the **Planner**, **Implementer**, **Reviewer**, and **Merger** their own animated workstations and shows recent logs and worktrees in one browser page.
+A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-dev/sandcastle) agent activity. In V3 you make your own CEO and walk round a first-person 3D office: the **Planner**, **Implementer**, **Reviewer**, and **Merger** each have a cubicle where they act out their status, with their log on the wall, and the file stack in the CEO's room switches between your Sandcastle projects. The V2 pixel-art dashboard is still at `/2d`.
 
 > **Read-only local monitor.** Pixel Office does not start, stop, schedule, or control agents. It displays information already written by your Sandcastle project.
 
 ## Features
 
-- Four pixel-art agent stations with activity indicators
-- Agent status: waiting, working, done, idle, or error
-- Recent activity log, selectable by agent role
-- Current Sandcastle worktree names
-- Overview counts for active agents, finished agents, and worktrees
-- Automatic refresh every **3 seconds**
-- Responsive browser layout for narrow and wide screens
-- Runs using **Python's standard library**, with no Python packages to install
+- First-person 3D office: create your CEO, then walk with **WASD** and look with the mouse
+- Five rooms: the CEO's room and a cubicle for each agent, read left to right from the hallway
+- **Project file stack** in the CEO's room: walk up to it and press **E** to switch projects
+- Press **E** at an agent's desk to read its log
+- Agent status: waiting, working, done, idle, or error, refreshed every **3 seconds**
+- V2 pixel-art dashboard at `/2d`, with recent logs, worktree names and overview counts
+- Runs using **Python's standard library**, with no Python packages or Node to install
 
 ## Requirements
 
@@ -53,6 +52,16 @@ The project should have logs at:
 
 If you don't set `SANDCASTLE_PROJECT`, the current server script uses the author's local ChatGPT Organizer path as a default. **Most users should set the environment variable explicitly.**
 
+To watch several projects, copy `projects.example.json` to `projects.json` and list them; each one becomes a file in the CEO's stack. `projects.json` is git-ignored, and without it Pixel Office watches just `SANDCASTLE_PROJECT`.
+
+```json
+{
+  "projects": [
+    { "id": "my-app", "name": "My App", "path": "~/code/my-app" }
+  ]
+}
+```
+
 ### 3. Start Pixel Office
 
 ```bash
@@ -75,7 +84,7 @@ Run Sandcastle from its own project terminal using that project's documented sta
 
 ## How monitoring works
 
-The local Python server serves the dashboard at `/` and status data at `/api/status`. Every 3 seconds the page requests a fresh snapshot.
+The local Python server serves the 3D office at `/`, the V2 dashboard at `/2d`, the project list at `/api/projects`, and one project's status at `/api/status?project=<id>`. Every 3 seconds the page requests a fresh snapshot.
 
 For each agent role, the server looks for its newest matching `*.log` file in `.sandcastle/logs/`. It uses recent log content and modification times to **infer** statuses; these are not authoritative agent-process states. If no matching log exists, the role shows *waiting*. The UI also lists directory names in `.sandcastle/worktrees/`.
 
@@ -103,13 +112,21 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | Dashboard UI, pixel-art visuals, and client-side polling |
-| `server.py` | Local HTTP server and read-only log/worktree status endpoint |
-| `.gitignore` | Excludes Python cache and local environment files |
+| `client/` | The 3D office's source (TypeScript, three.js, Vite) |
+| `client/src/vendor/agent-office/` | Parts adapted from agent-office (MIT), see `THIRD_PARTY_NOTICES.md` |
+| `dist/` | The built 3D office, committed so `python3 server.py` needs no Node |
+| `index.html` | V2 dashboard UI, pixel-art visuals, and client-side polling |
+| `server.py` | Local HTTP server and read-only log/worktree status endpoints |
+| `projects.example.json` | Example list of projects for the CEO's file stack |
+| `.gitignore` | Excludes Python cache, local environment files, `projects.json` and `node_modules/` |
+
+## Working on the 3D office
+
+You only need Node to change the 3D office. Run `npm install`, start `python3 server.py`, then `npm run dev` for a live-reloading copy on Vite's port (it forwards `/api` to the Python server). Run `npm run build` to rebuild `dist/` before committing.
 
 ## Current limitations
 
-- Reads **one** Sandcastle project at a time.
+- Shows **one** Sandcastle project's agents at a time (switch at the file stack).
 - Does not run or manage agents.
 - Status is inferred from log files, not a direct Sandcastle process API.
 - Does not include authentication or remote hosting support.
@@ -118,6 +135,8 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 ## Acknowledgments
 
 Special thanks to **[Matt Pocock](https://github.com/mattpocock)** for his work on Sandcastle and for inspiring this pixel-art view of the agent workflow.
+
+The 3D office's characters, movement and materials are adapted from [agent-office](https://github.com/AgentSystemLabs/agent-office) by AgentSystemLabs (MIT License); see `THIRD_PARTY_NOTICES.md`.
 
 ## Contributing
 

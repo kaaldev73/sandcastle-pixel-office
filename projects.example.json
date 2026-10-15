@@ -1,0 +1,6 @@
+{
+  "projects": [
+    { "id": "chatgpt-organizer", "name": "ChatGPT Organizer", "path": "~/Documents/Git/chatgpt-organizer" },
+    { "id": "my-other-app", "name": "My Other App", "path": "/absolute/path/to/my-other-app" }
+  ]
+}
