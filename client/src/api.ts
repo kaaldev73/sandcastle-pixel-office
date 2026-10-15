@@ -61,7 +61,12 @@ async function post<T>(url: string, body: object): Promise<T> {
 }
 
 /** Opens a GitHub issue on the project's repo, for the Planner to pick up: its address, or why not. */
-export const fileIssue = (project: string, title: string, body: string) => post<{ url: string }>('/api/issues', { project, title, body }).then((r) => r.url);
+export type IssueKind = 'feature' | 'bug' | null;
+export const fileIssue = (project: string, title: string, body: string, kind: IssueKind = null) =>
+  post<{ url: string }>('/api/issues', { project, title, body, kind }).then((r) => r.url);
+/** Has Claude read the project and write the CEO's note up as a full issue: an ID'd title, its kind, and the markdown body. */
+export const writeUp = (project: string, title: string, problem: string, want: string) =>
+  post<{ title: string; kind: IssueKind; body: string }>('/api/issues/write', { project, title, problem, want });
 
 /** Runs a project's app with its "run" command from projects.json, or stops it again. */
 export const startApp = (project: string) => post('/api/apps/start', { project });

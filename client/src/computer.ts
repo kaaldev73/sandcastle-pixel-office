@@ -1,4 +1,4 @@
-import { fileIssue, showOnScreen, startApp, stopApp, type ProjectSummary } from './api';
+import { fileIssue, showOnScreen, startApp, stopApp, writeUp, type IssueKind, type ProjectSummary } from './api';
 import { GAMES, type RetroArcade } from './games/arcade';
 import { STATUS_BULB } from './vendor/agent-office/character/agent';
 
@@ -28,6 +28,9 @@ interface Draft {
   title: string;
   problem: string;
   want: string;
+  /** Claude's write-up of it, as edited: filed instead of the note, if there is one. */
+  body?: string;
+  kind?: IssueKind;
   saved: number;
   url?: string;
 }
@@ -58,6 +61,9 @@ export class Computer {
   /** The project whose app the app window shows, and why it couldn't run it, if it couldn't. */
   private appId: string | null = null;
   private appError = '';
+  /** The kind of the write-up in the form (feature or bug), for its label; and the draft being written up, if one is. */
+  private kind: IssueKind = null;
+  private writing: string | null = null;
   /** Whether the app window shows the app itself, or (till you pick) where to watch it. */
   private watching = false;
 
@@ -80,6 +86,7 @@ export class Computer {
     $('pc-full').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
     $('issue-save').onclick = () => this.save();
     $('issue-file').onclick = () => void this.file();
+    $('issue-write').onclick = () => void this.writeUp();
     $('issue-new').onclick = () => this.edit(null);
     $<HTMLFormElement>('pc-issue-form').onsubmit = (e) => e.preventDefault();
     this.drawGames();
@@ -348,7 +355,11 @@ export class Computer {
       list.append(row);
     }
     const filed = this.drafts.find((d) => d.id === this.editing)?.url;
-    $<HTMLButtonElement>('issue-file').disabled = !!filed;
+    const writing = !!this.writing && this.writing === this.editing;
+    $<HTMLButtonElement>('issue-file').disabled = !!filed || writing;
+    $<HTMLButtonElement>('issue-write').disabled = !!filed || !!this.writing;
+    $<HTMLButtonElement>('issue-write').textContent = this.writing ? '✨ Writing…' : '✨ Write it up';
+    $<HTMLTextAreaElement>('issue-body').readOnly = writing;
   }
 
   /** Loads a saved issue into the form, or (null) clears it for a new one. */
@@ -358,6 +369,8 @@ export class Computer {
     $<HTMLInputElement>('issue-title').value = d?.title ?? '';
     $<HTMLTextAreaElement>('issue-problem').value = d?.problem ?? '';
     $<HTMLTextAreaElement>('issue-want').value = d?.want ?? '';
+    $<HTMLTextAreaElement>('issue-body').value = d?.body ?? '';
+    this.kind = d?.kind ?? null;
     if (d) $<HTMLSelectElement>('issue-project').value = d.project;
     this.say(d?.url ? `Filed: ${d.url}` : '');
     this.drawIssue();
@@ -371,6 +384,8 @@ export class Computer {
       title: $<HTMLInputElement>('issue-title').value.trim(),
       problem: $<HTMLTextAreaElement>('issue-problem').value.trim(),
       want: $<HTMLTextAreaElement>('issue-want').value.trim(),
+      body: $<HTMLTextAreaElement>('issue-body').value.trim() || undefined,
+      kind: this.kind,
       saved: Date.now(),
       url: old?.url,
     };
@@ -384,7 +399,7 @@ export class Computer {
 
   private save() {
     const d = this.form();
-    if (!d.title && !d.problem && !d.want) return this.say('Write something first.');
+    if (!d.title && !d.problem && !d.want && !d.body) return this.say('Write something first.');
     this.keep(d);
     this.say('Saved on this computer.');
     this.drawIssue();
@@ -395,22 +410,50 @@ export class Computer {
     const project = this.desk.projects().find((p) => p.id === d.project);
     if (!project) return this.say('Pick a project.');
     if (!d.title) return this.say('Give it a title first.');
-    if (!d.problem && !d.want) return this.say('Say what’s wrong or what you want.');
+    if (!d.problem && !d.want && !d.body) return this.say('Say what’s wrong or what you want.');
     if (!confirm(`File this as a GitHub issue on ${project.name}'s repo? The Planner picks up open issues on its next run.`)) return;
     this.keep(d);
-    const body = [d.problem && `## What's wrong\n\n${d.problem}`, d.want && `## What I want\n\n${d.want}`, `---\n_Filed from the CEO's computer in Sandcastle Pixel Office._`]
+    const body = d.body ?? [d.problem && `## What's wrong\n\n${d.problem}`, d.want && `## What I want\n\n${d.want}`, `---\n_Filed from the CEO's computer in Sandcastle Pixel Office._`]
       .filter(Boolean)
       .join('\n\n');
     const btn = $<HTMLButtonElement>('issue-file');
     btn.disabled = true;
     this.say('Filing on GitHub…');
     try {
-      d.url = await fileIssue(d.project, d.title, body);
+      d.url = await fileIssue(d.project, d.title, body, d.kind ?? null);
       this.keep(d);
       this.say(`Filed: ${d.url}`);
     } catch (e) {
       this.say(`Couldn’t file it (kept as a draft): ${(e as Error).message}`);
     }
+    if (this.view === 'issue') this.drawIssue();
+  }
+
+  /** Has Claude write the note up as a full issue, into the write-up box: saved as a draft first, so it's kept whatever you do meanwhile. */
+  private async writeUp() {
+    const d = this.form();
+    const project = this.desk.projects().find((p) => p.id === d.project);
+    if (!project) return this.say('Pick a project.');
+    if (!d.title && !d.problem && !d.want) return this.say('Write your note first: a title, what’s wrong, what you want.');
+    if (d.body && !confirm('Replace the write-up that’s there with a new one?')) return;
+    this.keep(d);
+    this.writing = d.id;
+    this.say(`Claude is reading ${project.name} and writing it up. That takes a minute or two.`);
+    this.drawIssue();
+    try {
+      const r = await writeUp(d.project, d.title, d.problem, d.want);
+      const now = this.drafts.find((o) => o.id === d.id) ?? d;
+      this.keep({ ...now, title: r.title, body: r.body, kind: r.kind, saved: Date.now() });
+      if (this.editing === d.id) {
+        $<HTMLInputElement>('issue-title').value = r.title;
+        $<HTMLTextAreaElement>('issue-body').value = r.body;
+        this.kind = r.kind;
+        this.say('Written up and saved. Read it over, edit anything, then File on GitHub.');
+      }
+    } catch (e) {
+      if (this.editing === d.id) this.say(`Couldn’t write it up: ${(e as Error).message}`);
+    }
+    this.writing = null;
     if (this.view === 'issue') this.drawIssue();
   }
 

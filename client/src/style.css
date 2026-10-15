@@ -110,7 +110,14 @@ button:hover { transform: translateY(-1px); }
 .acts button, .btn { padding: 4px 10px; font-size: 13px; }
 .btn { font-weight: 800; border: 3px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); text-decoration: none; }
 .btn.primary { background: var(--gold); }
-.issue { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 20px; max-width: 1100px; margin: 0 auto; }
+.issue { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 24px; max-width: 1500px; margin: 0 auto; }
+.writeup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.writeup-head { display: flex; align-items: center; gap: 8px; }
+.writeup-head h3 { margin: 0; }
+.writeup-head button { padding: 4px 12px; font-size: 13px; }
+.writeup-head button:disabled { opacity: 0.6; cursor: progress; transform: none; }
+#issue-body { min-height: 380px; resize: vertical; font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; padding: 10px 12px; border: 3px solid var(--ink); border-radius: 10px; background: #fff; color: var(--ink); }
+#issue-body:read-only { background: #f4efe6; }
 .issue .field select, .issue .field textarea, .issue .field input { display: block; width: 100%; margin-top: 4px; font: inherit; font-weight: 400; padding: 8px 10px; border: 3px solid var(--ink); border-radius: 10px; background: #fff; }
 .issue textarea { resize: vertical; }
 .app-head .pill { white-space: nowrap; margin-left: auto; }

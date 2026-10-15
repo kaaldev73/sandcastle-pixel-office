@@ -2,10 +2,10 @@
 """Local Sandcastle Pixel Office. Python standard library only.
 
 It only reads Sandcastle's logs: it never starts or stops agents. From the CEO's computer you can file
-a GitHub issue (with `gh`, in that project's folder), and run and stop a project's app with the command
-projects.json gives it (its "run"). A project can also have its built app served (read-only, on a port
-of its own), and opened on your own screen, in your normal browser. Apps it started are stopped when
-it stops."""
+a GitHub issue (with `gh`, in that project's folder), written up first by Claude Code reading the project
+if you like, and run and stop a project's app with the command projects.json gives it (its "run"). A
+project can also have its built app served (read-only, on a port of its own), and opened on your own
+screen, in your normal browser. Apps it started are stopped when it stops."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 import json, re, time, os, sys, mimetypes, socket, subprocess, threading, zlib, shlex, signal, atexit, webbrowser
@@ -241,10 +241,23 @@ def project_list():
                     "url": url})
     return {"projects": out}
 
-def file_issue(project, title, body):
-    """Opens a GitHub issue on the project's repo with `gh`, for Sandcastle's Planner to pick up."""
+def repo_labels(project):
+    """The labels the project's GitHub repo has (none if gh can't say)."""
     try:
-        done = subprocess.run(["gh", "issue", "create", "--title", title, "--body-file", "-"], cwd=project["root"],
+        done = subprocess.run(["gh", "label", "list", "--limit", "200", "--json", "name", "--jq", ".[].name"],
+                              cwd=project["root"], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return set()
+    return set(done.stdout.split("\n")) if done.returncode == 0 else set()
+
+def file_issue(project, title, body, kind=None):
+    """Opens a GitHub issue on the project's repo with `gh`, for Sandcastle's Planner to pick up. It's labelled
+    Sandcastle, and bug or enhancement for its kind, where the repo has those labels."""
+    want = ["Sandcastle", {"bug": "bug", "feature": "enhancement"}.get(kind)]
+    have = repo_labels(project)
+    labels = [x for l in want if l and l in have for x in ("--label", l)]
+    try:
+        done = subprocess.run(["gh", "issue", "create", "--title", title, "--body-file", "-", *labels], cwd=project["root"],
                               input=body, capture_output=True, text=True, timeout=60)
     except FileNotFoundError:
         return 500, {"error": "The GitHub CLI (gh) isn't installed."}
@@ -254,6 +267,78 @@ def file_issue(project, title, body):
         return 500, {"error": clean((done.stderr or done.stdout).strip() or f"gh exited with code {done.returncode}")}
     url = next((w for w in done.stdout.split() if w.startswith("https://")), done.stdout.strip())
     return 200, {"url": url}
+
+WRITE_UP = """You turn a short note from the CEO into a GitHub issue for Sandcastle's coding agents, who plan and build
+from it. You're in the project's folder: read its README and code (Read, Grep, Glob) so the issue fits how the
+app really works, names the real parts it touches and asks for nothing it already has. Don't change anything.
+
+The CEO's note, for the project "{name}":
+<title>{title}</title>
+<whats_wrong>{problem}</whats_wrong>
+<what_they_want>{want}</what_they_want>
+
+Issues already on its repo (number, title), to pick the next ID from and not repeat:
+{existing}
+
+Write it in this shape, as their other issues are:
+
+# FEAT-006 — Short name of it
+## Objective
+What it's for, in a few lines; what it must NOT do, if anything.
+## 1. First part
+## 2. Next part
+... as many numbered sections as it needs, each saying what to build or fix: workflows as numbered steps,
+requirements as bullets, fallbacks if something may not be reliable, what to persist and how to migrate data,
+privacy and security where it touches user data or permissions, UI that matches the existing design, and
+engineering notes (what to inspect first, what to reuse, what not to break).
+## Tests
+The automated tests to add, as bullets, then the commands that must pass (from the project's package.json or
+equivalent, such as npm test and npm run build).
+## Acceptance Criteria
+- [ ] Checkable outcomes, one per line.
+## Important
+The one or two things that matter most.
+
+Use FEAT-NNN for a feature or change and BUG-NNN for something broken, numbered one past the highest of that kind
+above (001 if none). Keep it as long as the work needs and no longer; don't invent requirements the note doesn't
+imply. Reply with exactly this and nothing else:
+TITLE: <ID>: <title>
+KIND: feature or bug
+=====
+<the issue body in markdown, starting with the # heading>"""
+
+def write_up(project, title, problem, want):
+    """Has Claude (Claude Code, headless, read-only in the project's folder) write the CEO's note up as a full issue."""
+    try:
+        listed = subprocess.run(["gh", "issue", "list", "--state", "all", "--limit", "200", "--json", "number,title",
+                                 "--jq", '.[] | "#\\(.number) \\(.title)"'], cwd=project["root"],
+                                capture_output=True, text=True, timeout=30)
+        existing = listed.stdout.strip() if listed.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        existing = ""
+    prompt = WRITE_UP.format(name=project["name"], title=title, problem=problem or "(nothing)",
+                             want=want or "(nothing)", existing=existing or "(none, or gh couldn't list them)")
+    try:
+        done = subprocess.run(["claude", "-p", "--restricted", "--tools", "Read,Grep,Glob", "--strict-mcp-config",
+                               "--no-session-persistence", "--permission-mode", "dontAsk", "--output-format", "json"],
+                              cwd=project["root"], input=prompt, capture_output=True, text=True, timeout=600)
+    except FileNotFoundError:
+        return 500, {"error": "Claude Code (claude) isn't installed."}
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return 500, {"error": f"Claude didn't finish: {e}"}
+    try:
+        reply = json.loads(done.stdout)
+    except ValueError:
+        reply = {"is_error": True, "result": (done.stderr or done.stdout).strip()}
+    text = str(reply.get("result") or "")
+    if reply.get("is_error") or done.returncode != 0:
+        return 500, {"error": clean(text or f"claude exited with code {done.returncode}")}
+    m = re.search(r"(?m)^TITLE:\s*(.+)\n(?:KIND:\s*(\w+)\s*\n)?=+\s*\n", text)
+    if not m:
+        return 500, {"error": "Claude's write-up wasn't in the expected shape. Try again."}
+    kind = (m.group(2) or "").lower()
+    return 200, {"title": m.group(1).strip()[:200], "kind": kind if kind in ("feature", "bug") else None,
+                 "body": text[m.end():].strip()}
 
 def snapshot(root):
     logs = root / ".sandcastle" / "logs"
@@ -300,7 +385,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
-        if path not in ("/api/issues", "/api/apps/start", "/api/apps/stop", "/api/apps/screen"):
+        if path not in ("/api/issues", "/api/issues/write", "/api/apps/start", "/api/apps/stop", "/api/apps/screen"):
             self.send_error(404)
             return
         # Only from this page: another site open in the browser can't send JSON here without asking
@@ -315,10 +400,19 @@ class Handler(BaseHTTPRequestHandler):
             pid = str(data["project"])
             if path == "/api/issues":
                 title, body = str(data["title"]).strip()[:200], str(data["body"])[:60_000]
+                kind = data.get("kind") if data.get("kind") in ("feature", "bug") else None
+            elif path == "/api/issues/write":
+                note = [str(data.get(k) or "").strip()[:20_000] for k in ("title", "problem", "want")]
         except (ValueError, KeyError, TypeError):
             self.send_json(400, {"error": "Bad request."})
             return
         project = next((p for p in load_projects() if p["id"] == pid), None)
+        if path == "/api/issues/write":
+            if not project or not any(note):
+                self.send_json(400, {"error": "Pick a project and say what you want first."})
+            else:
+                self.send_json(*write_up(project, *note))
+            return
         if path != "/api/issues":
             if not project:
                 self.send_json(400, {"error": "No such project."})
@@ -329,7 +423,7 @@ class Handler(BaseHTTPRequestHandler):
         if not project or not title:
             self.send_json(400, {"error": "Pick a project and give the issue a title."})
             return
-        self.send_json(*file_issue(project, title, body))
+        self.send_json(*file_issue(project, title, body, kind))
 
     def do_GET(self):
         url = urlsplit(self.path)
