@@ -184,7 +184,7 @@ You only need Node to change the 3D office. Run `npm install`, start `python3 se
 
 Special thanks to **[Matt Pocock](https://github.com/mattpocock)** for his work on Sandcastle and for inspiring this pixel-art view of the agent workflow.
 
-The 3D office's characters, movement and materials are adapted from [agent-office](https://github.com/AgentSystemLabs/agent-office) by AgentSystemLabs (MIT License); see `THIRD_PARTY_NOTICES.md`.
+Thanks to **K¥Ø** and to **[agent-office](https://github.com/AgentSystemLabs/agent-office)** by AgentSystemLabs for the V3 3D office. Its characters, movement and materials are adapted from agent-office (MIT License); see `THIRD_PARTY_NOTICES.md`.
 
 ## Contributing
 
