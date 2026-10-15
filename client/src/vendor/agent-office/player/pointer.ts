@@ -1,14 +1,17 @@
 // Adapted from agent-office client/player/pointer.ts (https://github.com/AgentSystemLabs/agent-office, commit 852e2ab).
 // Copyright (c) 2026 AgentSystemLabs. MIT License: see THIRD_PARTY_NOTICES.md.
-// Changes: first person only (no third-person orbit or zoom), and none of the window hand-back logic.
+// Changes: the mouse stays locked in third person too (it orbits the camera there), and none of the window hand-back logic.
 
 import * as THREE from 'three';
 
-// Your hands on the controls: the keys you hold, and the mouse, which looks around. A click on the
-// scene captures the mouse (pointer lock); where it won't lock, you drag to look.
+// Your hands on the controls: the keys you hold, and the mouse, which looks around in first person
+// and swings the camera round you in third (the wheel zooms it). A click on the scene captures the
+// mouse (pointer lock); where it won't lock, you drag to look.
 
 const LOOK_SPEED = 0.0022; // radians per pixel of mouse movement while the pointer is locked
 const DRAG_LOOK_SPEED = 0.005;
+
+export type ViewMode = 'first' | 'third';
 
 /** Where you look and what steers it: the PlayerController is built on this (see controller.ts). */
 export abstract class PlayerInput {
@@ -16,6 +19,10 @@ export abstract class PlayerInput {
   camYaw = 0;
   /** Look up (+) / down (-). */
   lookPitch = -0.08;
+  /** In third person: how high the camera is over you (radians), and how far back. */
+  camPitch = 0.35;
+  camDist = 4.5;
+  view: ViewMode = 'first';
   protected keys = new Set<string>();
   private drag: { x: number; y: number } | null = null;
   /** Set when this browser won't lock the pointer; falls back to drag-to-look. */
@@ -53,6 +60,14 @@ export abstract class PlayerInput {
       this.look(dx * DRAG_LOOK_SPEED, dy * DRAG_LOOK_SPEED);
     });
     document.addEventListener('pointerlockerror', () => (this.lockFailed = true));
+    dom.addEventListener(
+      'wheel',
+      (e) => {
+        if (this.enabled && this.view === 'third') this.camDist = THREE.MathUtils.clamp(this.camDist + e.deltaY * 0.004, 1.6, 9);
+        e.preventDefault();
+      },
+      { passive: false },
+    );
   }
 
   get locked(): boolean {
@@ -84,7 +99,8 @@ export abstract class PlayerInput {
 
   private look(dx: number, dy: number) {
     this.camYaw -= dx;
-    this.lookPitch = THREE.MathUtils.clamp(this.lookPitch - dy, -1.45, 1.45);
+    if (this.view === 'first') this.lookPitch = THREE.MathUtils.clamp(this.lookPitch - dy, -1.45, 1.45);
+    else this.camPitch = THREE.MathUtils.clamp(this.camPitch + dy, -0.15, 1.2);
   }
 }
 

@@ -3,10 +3,13 @@ import { Agent, type AgentStatus } from './vendor/agent-office/character/agent';
 import { FLOOR_PALETTES, PALETTE, floorTexture, glassPane } from './vendor/agent-office/materials';
 import { mesh, roundedBox, textPlane, textSprite, toon } from './vendor/agent-office/toon';
 import type { Collider } from './vendor/agent-office/types';
+import { Outdoors } from './outdoors';
+import { Wanderer, type Point, type Spot } from './wander';
 
 // The office: one floor with the CEO's room on the north side of a hallway and the four agents'
 // cubicles on the south side, left to right (from the hallway) in the order work goes through them. Forward is -z
-// (north); the floor runs from (-12, -10) to (12, 10).
+// (north); the floor runs from (-12, -10) to (12, 10). The lounge in the north-west corner has windows
+// on its two outside walls, onto the beach and the hills (outdoors.ts).
 
 export const ROLES = [
   { role: 'planner', title: 'Planner', color: '#d3a3ff', palette: 3 },
@@ -17,7 +20,7 @@ export const ROLES = [
 export type Role = (typeof ROLES)[number]['role'];
 
 const FLOOR = { minX: -12, maxX: 12, minZ: -10, maxZ: 10 };
-const WALL_H = 3;
+export const WALL_H = 3;
 const WALL_T = 0.2;
 /** How high the cubicles' partitions come: over a desk, under your eyes. */
 const PARTITION_H = 1.5;
@@ -25,9 +28,11 @@ const CEO = { minX: -6, maxX: 6, minZ: -10, maxZ: -2 };
 /** The hallway between the CEO's room and the cubicles. */
 const HALL = { minZ: -2, maxZ: 2 };
 const DOOR = 0.9;
+/** The lounge with the view: the stretch of the north wall west of the CEO's room, and of the west wall north of the hallway. */
+const VIEW = { maxX: CEO.minX, maxZ: HALL.minZ };
 
 /** Something you can walk up to and press E at. */
-export type Interactable = { x: number; z: number; radius: number; label: string } & ({ kind: 'files' } | { kind: 'agent'; role: Role });
+export type Interactable = { x: number; z: number; radius: number; label: string } & ({ kind: 'files' } | { kind: 'pc' } | { kind: 'agent'; role: Role });
 
 /** Where you start: in the CEO's room, in front of your desk, looking at it. */
 export const SPAWN = { x: 0, z: -4.2, yaw: 0 };
@@ -41,7 +46,15 @@ export class Office {
   readonly group = new THREE.Group();
   readonly colliders: Collider[] = [];
   readonly interactables: Interactable[] = [];
+  /** The CEO's CRT: main.ts puts the arcade on it. */
+  readonly pcScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.27), new THREE.MeshBasicMaterial({ color: '#0a0a18' }));
+  readonly outdoors = new Outdoors();
   readonly agents = new Map<Role, Agent>();
+  readonly wanderers = new Map<Role, Wanderer>();
+  /** Where the agents go when they've nothing to do, and which of those someone's at. */
+  private spots: Spot[] = [];
+  private taken = new Set<Spot>();
+  private desks = new Map<Role, Spot>();
   private screens = new Map<Role, LogScreen>();
   private stack = new THREE.Group();
   private projectSign: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
@@ -49,10 +62,15 @@ export class Office {
   private trim = toon(FLOOR_PALETTES[0].trim);
 
   constructor() {
+    this.group.add(this.outdoors.group);
     this.buildShell();
     this.buildCeoRoom();
     ROLES.forEach((r, i) => this.buildCubicle(r, i));
     this.buildHall();
+    ROLES.forEach((r, i) => {
+      const w = new Wanderer(this.agents.get(r.role)!, this.desks.get(r.role)!, this.spots, this.taken, -0.75 + i * 0.5);
+      this.wanderers.set(r.role, w);
+    });
   }
 
   /** A solid box from (x0, z0) to (x1, z1), `h` tall from `y`, that you bump into. */
@@ -71,6 +89,35 @@ export class Office {
   /** A wall along z at `x` from z0 to z1. */
   private wallZ(x: number, z0: number, z1: number, h: number, mat: THREE.Material, doors: number[] = []) {
     for (const [a, b] of gaps(z0, z1, doors)) this.solid(x - WALL_T / 2, x + WALL_T / 2, a, b, h, mat);
+  }
+
+  /** A floor-to-ceiling window across the box (x0, z0)–(x1, z1): a low sill, glass, frames, and a header. */
+  private windowWall(x0: number, x1: number, z0: number, z1: number) {
+    const alongX = x1 - x0 > z1 - z0;
+    const len = alongX ? x1 - x0 : z1 - z0;
+    const SILL = 0.35;
+    const HEAD = 0.3;
+    this.solid(x0, x1, z0, z1, SILL, this.trim, 0, false);
+    this.solid(x0, x1, z0, z1, HEAD, this.trim, WALL_H - HEAD, false);
+    this.colliders.push({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: WALL_H });
+    const panes = Math.ceil(len / 2);
+    const frame = toon(PALETTE.ink);
+    for (let i = 0; i < panes; i++) {
+      const a = (len / panes) * i;
+      const w = len / panes;
+      const pane = glassPane(w, WALL_H - SILL - HEAD);
+      const mid = a + w / 2;
+      if (alongX) pane.position.set(x0 + mid, SILL + (WALL_H - SILL - HEAD) / 2, (z0 + z1) / 2);
+      else {
+        pane.position.set((x0 + x1) / 2, SILL + (WALL_H - SILL - HEAD) / 2, z0 + mid);
+        pane.rotation.y = Math.PI / 2;
+      }
+      this.group.add(pane);
+      if (i === 0) continue;
+      // The frame between two panes.
+      if (alongX) this.solid(x0 + a - 0.04, x0 + a + 0.04, z0, z1, WALL_H - SILL - HEAD, frame, SILL, false);
+      else this.solid(x0, x1, z0 + a - 0.04, z0 + a + 0.04, WALL_H - SILL - HEAD, frame, SILL, false);
+    }
   }
 
   private buildShell() {
@@ -94,9 +141,11 @@ export class Office {
     this.group.add(ceiling);
 
     const t = WALL_T;
-    this.wallX(FLOOR.minZ - t / 2, FLOOR.minX - t, FLOOR.maxX + t, WALL_H, this.wall);
+    this.windowWall(FLOOR.minX - t, VIEW.maxX, FLOOR.minZ - t, FLOOR.minZ);
+    this.wallX(FLOOR.minZ - t / 2, VIEW.maxX, FLOOR.maxX + t, WALL_H, this.wall);
     this.wallX(FLOOR.maxZ + t / 2, FLOOR.minX - t, FLOOR.maxX + t, WALL_H, this.wall);
-    this.wallZ(FLOOR.minX - t / 2, FLOOR.minZ, FLOOR.maxZ, WALL_H, this.wall);
+    this.windowWall(FLOOR.minX - t, FLOOR.minX, FLOOR.minZ, VIEW.maxZ);
+    this.wallZ(FLOOR.minX - t / 2, VIEW.maxZ, FLOOR.maxZ, WALL_H, this.wall);
     this.wallZ(FLOOR.maxX + t / 2, FLOOR.minZ, FLOOR.maxZ, WALL_H, this.wall);
     // Skirting all round, in the trim color.
     for (const [x0, x1, z0, z1] of [
@@ -138,9 +187,10 @@ export class Office {
     const plate = textPlane('CEO', { bg: '#2b2d42', color: '#ffd166', size: 40, border: '#ffd166' });
     plate.position.set(0, 0.5, -6.59);
     this.group.add(plate);
-    this.group.add(laptop(0.4, 0.78, -7.05, Math.PI));
+    this.group.add(retroPc(this.pcScreen, 0.15, 0.78, -7.0, Math.PI));
+    this.interactables.push({ kind: 'pc', x: 0, z: -8.1, radius: 1.2, label: 'Play games on the computer' });
     this.group.add(mug('#e63946', -0.6, 0.78, -6.9));
-    this.group.add(chair(PALETTE.chairs[3], 0, -8.1, 0, 1.15));
+    this.group.add(chair(PALETTE.chairs[3], 0, -8.1, Math.PI, 1.15));
 
     // The wall behind the desk: the company's name, and which project you're looking at.
     const back = textPlane('🏰 Sandcastle HQ', { bg: '#fffaf3', size: 64 });
@@ -202,11 +252,13 @@ export class Office {
     this.group.add(stool);
     this.colliders.push(box(cx, 7.65, 0.3, 0.5));
     const agent = new Agent(r.title, r.color);
-    agent.root.position.set(cx, 0.4, 7.65);
-    agent.root.rotation.y = Math.PI;
     this.group.add(agent.root);
     this.agents.set(r.role, agent);
-    this.interactables.push({ kind: 'agent', role: r.role, x: cx, z: deskZ - 0.9, radius: 1.5, label: `Read ${r.title}'s log` });
+    // Its stool, reached round the end of the desk; and its doorway, where the others come to chat.
+    this.desks.set(r.role, { doing: 'at my desk', hallX: cx, path: [{ x: cx, z: 3.2 }, { x: cx + 1.7, z: 5.2 }, { x: cx + 1.7, z: 7.65 }, { x: cx, z: 7.65 }], face: Math.PI, sitY: 0.4 });
+    this.spots.push({ doing: `chatting at the ${r.title}'s desk`, hallX: cx, path: [{ x: cx - 0.4, z: 3.5 }], face: 0.3 });
+    // Where you press E to talk to it: in front of its desk while it's there, or wherever it's got to (see update).
+    this.interactables.push({ kind: 'agent', role: r.role, x: cx, z: deskZ - 0.9, radius: 1.5, label: `Talk to the ${r.title}` });
 
     // Its log, up on the back wall beside it.
     const screen = new LogScreen(r.title, FLOOR_PALETTES[r.palette].trim);
@@ -233,7 +285,19 @@ export class Office {
       this.solid(cx - 0.7, cx + 0.7, -6.9, -6.1, 0.4, toon(PALETTE.wood));
       this.group.add(plant(cx + sx * 2.4, -9.4, 1.3));
       this.colliders.push(box(cx + sx * 2.4, -9.4, 0.4, 1.3));
+      // Somewhere for the agents to sit, round the far side of the coffee table.
+      const side = cx + sx * 1.9;
+      for (const seat of [cx - 0.7, cx + 0.7])
+        this.spots.push({ doing: 'taking a break on the sofa', hallX: side, path: [{ x: side, z: -8.3 }, { x: seat, z: -8.4 }, { x: seat, z: -9.2 }], face: 0, sitY: 0.33 });
     }
+    // The view out of the west lounge's windows; a stand by the east lounge's table; chats in the hallway.
+    this.spots.push(
+      { doing: 'looking at the view', hallX: -10.9, path: [{ x: -11.2, z: -4.6 }], face: -Math.PI / 2 },
+      { doing: 'admiring the beach', hallX: -7, path: [{ x: -7, z: -7.6 }], face: -2.7 },
+      { doing: 'stretching my legs in the lounge', hallX: 7.4, path: [{ x: 7.4, z: -5.4 }], face: 2.4 },
+      { doing: 'having a chat in the hallway', hallX: -3.5, path: [{ x: -3.5, z: -1.3 }], face: 0.4 },
+      { doing: 'having a chat in the hallway', hallX: 4.5, path: [{ x: 4.5, z: 1.3 }], face: Math.PI - 0.4 },
+    );
     // Pendant lamps down the hallway.
     for (let x = -10; x <= 10; x += 4) {
       this.group.add(mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.5, 4), toon(PALETTE.ink), x, WALL_H - 0.25, 0, false));
@@ -284,8 +348,24 @@ export class Office {
     this.screens.get(role)?.draw(status, events);
   }
 
+  /** Stops `role` to talk to whoever's at `at` (or lets everyone get on, with null). */
+  talk(role: Role | null, at: Point | null) {
+    for (const [r, w] of this.wanderers) w.talkingTo = r === role ? at : null;
+  }
+
   update(t: number, dt: number) {
+    this.outdoors.update(t);
+    for (const w of this.wanderers.values()) w.update(dt);
     for (const a of this.agents.values()) a.update(dt, t);
+    // Talking to an agent: at the front of its desk while it's sat there, or by it wherever it's got to.
+    for (const it of this.interactables) {
+      if (it.kind !== 'agent') continue;
+      const w = this.wanderers.get(it.role)!;
+      const desk = w.desk.path.at(-1)!;
+      const p = w.atDesk ? { x: desk.x, z: desk.z - 1.75 } : w.agent.root.position;
+      it.x = p.x;
+      it.z = p.z;
+    }
   }
 }
 
@@ -328,6 +408,28 @@ function laptop(x: number, y: number, z: number, rotY: number): THREE.Group {
   logo.rotation.y = Math.PI;
   lid.add(logo);
   g.add(lid);
+  return g;
+}
+
+/** The CEO's computer: a beige box with a CRT on it and a keyboard, facing +z once turned `rotY`, `screen` on the tube. */
+function retroPc(screen: THREE.Mesh, x: number, y: number, z: number, rotY: number): THREE.Group {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  g.rotation.y = rotY;
+  const beige = toon('#e8dcc0');
+  const dark = toon('#3a3a4a');
+  g.add(mesh(new THREE.BoxGeometry(0.5, 0.08, 0.36), beige, 0, 0.04, 0));
+  g.add(mesh(new THREE.BoxGeometry(0.16, 0.012, 0.01), dark, 0.12, 0.05, 0.181, false));
+  g.add(mesh(new THREE.BoxGeometry(0.46, 0.38, 0.32), beige, 0, 0.27, 0));
+  g.add(mesh(new THREE.BoxGeometry(0.32, 0.26, 0.16), beige, 0, 0.26, -0.22));
+  g.add(mesh(new THREE.BoxGeometry(0.4, 0.31, 0.01), dark, 0, 0.28, 0.161, false));
+  screen.position.set(0, 0.28, 0.167);
+  screen.userData.screen = true;
+  g.add(screen);
+  g.add(mesh(new THREE.BoxGeometry(0.02, 0.02, 0.01), toon('#06d6a0', { emissive: '#06d6a0' }), 0.19, 0.11, 0.161, false));
+  const keyboard = mesh(new THREE.BoxGeometry(0.44, 0.025, 0.14), beige, 0, 0.012, 0.3);
+  keyboard.rotation.x = 0.06;
+  g.add(keyboard);
   return g;
 }
 
@@ -382,6 +484,7 @@ class LogScreen {
     this.tex.colorSpace = THREE.SRGBColorSpace;
     this.tex.anisotropy = 8;
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 1.31), new THREE.MeshBasicMaterial({ map: this.tex }));
+    this.mesh.userData.screen = true;
     this.draw('waiting', []);
   }
 

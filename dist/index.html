@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Sandcastle • Pixel Office</title>
     <link rel="icon" href="data:," />
-    <script type="module" crossorigin src="/static/index-TfbT71h1.js"></script>
-    <link rel="stylesheet" crossorigin href="/static/index-p4X9Rb2g.css">
+    <script type="module" crossorigin src="/static/index-CTZuTXpJ.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/index-w3pjhWjA.css">
   </head>
   <body>
     <canvas id="scene"></canvas>
@@ -32,10 +32,10 @@
         <div class="agents" id="agent-dots"></div>
         <div class="muted small" id="connection">Connecting…</div>
       </div>
-      <div class="crosshair"></div>
+      <div class="crosshair" id="crosshair"></div>
       <div class="hint" id="hint" hidden></div>
       <div class="panel help" id="help">
-        <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · <b>Mouse</b> look · <b>E</b> use · <b>C</b> change CEO
+        <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · <b>Mouse</b> look · <b>E</b> use · <b>V</b> view · <b>C</b> change CEO
       </div>
       <div class="click" id="click-to-look">Click to look around</div>
     </section>
@@ -48,8 +48,15 @@
 
     <section id="log" class="panel modal" hidden>
       <div class="modal-head"><h2 id="log-title">Log</h2><button class="ghost close" data-close>Esc ✕</button></div>
+      <p class="say" id="log-say"></p>
       <div class="muted small" id="log-file"></div>
       <div id="log-lines" class="feed"></div>
+    </section>
+
+    <section id="arcade" class="panel modal arcade" hidden>
+      <div class="modal-head"><h2>🕹️ The CEO's computer</h2><button class="ghost close" data-close>Esc ✕</button></div>
+      <div class="crt" id="arcade-screen"></div>
+      <div class="muted small">Arrows or WASD move · Space / Enter action · P pause · M sound · Esc back</div>
     </section>
 
   </body>

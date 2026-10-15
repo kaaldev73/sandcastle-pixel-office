@@ -70,3 +70,13 @@ button:hover { transform: translateY(-1px); }
 .feed { overflow: auto; background: #0f1724; color: #adc2dc; border-radius: 10px; padding: 10px 12px; font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; min-height: 120px; }
 .feed div { border-bottom: 1px solid #1b2940; overflow-wrap: anywhere; padding: 2px 0; }
 .feed div:last-child { color: #80e6bd; }
+
+/* The CEO's computer: the arcade on a CRT, big chunky pixels and scanlines. */
+.arcade { width: min(820px, calc(100vw - 32px)); background: #e8dcc0; }
+.crt { position: relative; width: min(100%, calc((100vh - 190px) * 4 / 3)); aspect-ratio: 4 / 3; margin: 0 auto; background: #000; border: 14px solid #2b2d42; border-radius: 28px; overflow: hidden; }
+.crt canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.crt::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, #0000002e 0 1px, transparent 1px 3px); box-shadow: inset 0 0 70px #000000a0; }
+
+/* Talking to an agent: what it says, in a speech bubble over its log. */
+.say { margin: 4px 0; padding: 10px 14px; background: #fff; border: 3px solid var(--ink); border-radius: 14px 14px 14px 4px; font-weight: 700; }
+.pill { font-size: 12px; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 2px solid var(--ink); vertical-align: middle; }

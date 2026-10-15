@@ -5,15 +5,18 @@ import { FirstPersonBody } from './vendor/agent-office/character/person-first';
 import { STATUS_BULB } from './vendor/agent-office/character/agent';
 import { PlayerController } from './vendor/agent-office/player/controller';
 import { mesh, toon } from './vendor/agent-office/toon';
+import { RetroArcade } from './games/arcade';
 import { fetchProjects, fetchStatus, type ProjectSummary, type StatusSnapshot } from './api';
 import { SHIRTS, loadCeo, randomCeo, saveCeo, type Ceo } from './ceo';
-import { Office, ROLES, SPAWN, type Interactable, type Role } from './office';
+import { Office, ROLES, SPAWN, WALL_H, type Interactable, type Role } from './office';
 
 // The page: the character screen where you make your CEO, then the office you walk round in first
-// person, with the project picker at the file stack and each agent's log at its desk.
+// or third person, with the project picker at the file stack, each agent's log at its desk, and the
+// games on the CEO's computer.
 
 const POLL_MS = 3000;
 const PROJECT_KEY = 'pixel-office.project';
+const VIEW_KEY = 'pixel-office.view';
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const canvas = $<HTMLCanvasElement>('scene');
@@ -21,7 +24,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 120);
+const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 300);
 
 function lights(scene: THREE.Scene, shadowSize: number) {
   scene.add(new THREE.HemisphereLight('#ffffff', '#d9c7a8', 1.9));
@@ -44,10 +47,17 @@ scene.background = new THREE.Color('#bfe3ff');
 lights(scene, 14);
 const office = new Office();
 scene.add(office.group);
+const arcade = new RetroArcade();
+office.pcScreen.material.color.set('#ffffff');
+office.pcScreen.material.map = arcade.texture;
+office.pcScreen.material.needsUpdate = true;
+$('arcade-screen').append(arcade.canvas);
 const player = new PlayerController(camera, canvas, office.colliders);
 player.pos.set(SPAWN.x, 0, SPAWN.z);
 player.camYaw = SPAWN.yaw;
 player.enabled = false;
+player.roof = WALL_H - 0.25;
+if (localStorage.getItem(VIEW_KEY) === 'third') player.setView('third');
 
 let ceo: Ceo = loadCeo() ?? randomCeo();
 const me = new Person('', ceo.shirt, ceo.look);
@@ -66,7 +76,7 @@ let spin = 0.4;
 let spinV = 0.6;
 let dragX: number | null = null;
 
-type Mode = 'creator' | 'office' | 'picker' | 'log';
+type Mode = 'creator' | 'office' | 'picker' | 'log' | 'arcade';
 let mode: Mode = 'creator';
 
 function swatches(el: HTMLElement, colors: string[], names: string[] | null, pick: (i: number) => void) {
@@ -211,11 +221,48 @@ function drawPicker() {
   });
 }
 
+/** What each agent does, in its own words. */
+const JOBS: Record<Role, string> = {
+  planner: 'I read the issues and plan the work for the Implementer.',
+  implementer: 'I write the code from the Planner’s plan.',
+  reviewer: 'I review what the Implementer changed.',
+  merger: 'I merge the finished work in.',
+};
+
+function ago(seconds: number | null): string {
+  if (!seconds) return 'never';
+  const s = Math.max(0, Date.now() / 1000 - seconds);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} days ago`;
+}
+
+/** What `role` tells you when you stop to talk: its job, how it's doing, and where it is. */
+function say(role: Role): string {
+  const a = snapshot?.agents.find((x) => x.role === role);
+  const status = a?.status ?? 'waiting';
+  const last = a?.events.at(-1);
+  const where = office.wanderers.get(role)!.doing;
+  const project = snapshot?.name ?? 'this project';
+  const line = {
+    working: `I’m busy on ${project} right now${last ? `: “${last}”` : '.'}`,
+    done: `All done on ${project}${last ? `: “${last}”` : '!'} So I’m ${where} until there’s more.`,
+    idle: `Nothing new from me on ${project} for a while. I’m ${where}.`,
+    waiting: `I haven’t started on ${project} yet: no log from me so far. I’m ${where} until Sandcastle runs me.`,
+    error: `Something went wrong on ${project}${last ? `: “${last}”` : '.'} Have a look at my log below.`,
+  }[status];
+  return `${JOBS[role]} ${line} My log last changed ${ago(a?.updated ?? null)}.`;
+}
+
 let logRole: Role = 'planner';
 function drawLog() {
   const a = snapshot?.agents.find((x) => x.role === logRole);
-  const title = ROLES.find((r) => r.role === logRole)!.title;
-  $('log-title').textContent = `${title} · ${a?.status ?? 'waiting'}`;
+  const r = ROLES.find((x) => x.role === logRole)!;
+  const status = a?.status ?? 'waiting';
+  $('log-title').innerHTML = `💬 The ${r.title} <span class="pill" style="background:${STATUS_BULB[status]}">${status}</span>`;
+  $('log-say').textContent = say(logRole);
+  $('log-say').style.borderColor = r.color;
   $('log-file').textContent = a?.log ? `${snapshot!.name} / .sandcastle/logs/${a.log}` : 'No log file yet';
   const feed = $('log-lines');
   const near = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 40;
@@ -228,7 +275,7 @@ function drawLog() {
   if (near) feed.scrollTop = feed.scrollHeight;
 }
 
-function openModal(which: 'picker' | 'log') {
+function openModal(which: 'picker' | 'log' | 'arcade') {
   mode = which;
   player.enabled = false;
   player.clearKeys();
@@ -237,11 +284,17 @@ function openModal(which: 'picker' | 'log') {
   if (which === 'picker') {
     drawPicker();
     void loadProjects();
-  } else drawLog();
+  } else if (which === 'log') {
+    office.talk(logRole, player.pos);
+    drawLog();
+  }
+  else arcade.show();
 }
 
 function closeModal() {
-  if (mode !== 'picker' && mode !== 'log') return;
+  if (mode !== 'picker' && mode !== 'log' && mode !== 'arcade') return;
+  if (mode === 'arcade') arcade.hide();
+  if (mode === 'log') office.talk(null, null);
   $(mode).hidden = true;
   mode = 'office';
   player.enabled = true;
@@ -252,6 +305,7 @@ for (const b of document.querySelectorAll<HTMLElement>('[data-close]')) b.onclic
 
 function use(it: Interactable) {
   if (it.kind === 'files') openModal('picker');
+  else if (it.kind === 'pc') openModal('arcade');
   else {
     logRole = it.role;
     openModal('log');
@@ -279,6 +333,15 @@ window.addEventListener('keydown', (e) => {
       const it = nearby();
       if (it) use(it);
     } else if (e.code === 'KeyC') openCreator();
+    else if (e.code === 'KeyV') {
+      player.setView(player.view === 'first' ? 'third' : 'first');
+      localStorage.setItem(VIEW_KEY, player.view);
+    }
+  } else if (mode === 'arcade') {
+    if (e.code === 'Escape') {
+      if (!arcade.back()) closeModal();
+    } else arcade.keydown(e.code, e.repeat);
+    if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
   } else if (mode === 'picker' || mode === 'log') {
     if (e.code === 'Escape' || e.code === 'KeyE') closeModal();
     const n = Number(e.key);
@@ -286,7 +349,34 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+window.addEventListener('keyup', (e) => arcade.keyup(e.code));
+
 // ---- Every frame ----
+
+/**
+ * For one drawing in third person: hides the signs, name tags and status cards that hang between the
+ * camera and you, or that it's come right up against (they have no collider to keep it off), so they
+ * don't fill the screen. Returns what shows them again.
+ */
+const signBox = new THREE.Box3();
+const sightLine = new THREE.Raycaster();
+const toMe = new THREE.Vector3();
+function hideCloseSigns(): () => void {
+  if (player.view !== 'third') return () => {};
+  const signs: THREE.Object3D[] = [];
+  office.group.traverseVisible((o) => {
+    if (o instanceof THREE.Sprite || (o instanceof THREE.Mesh && o.material instanceof THREE.MeshBasicMaterial && !!o.material.map && !o.userData.screen)) signs.push(o);
+  });
+  toMe.set(player.pos.x, player.pos.y + 1, player.pos.z).sub(camera.position);
+  sightLine.set(camera.position, toMe.clone().normalize());
+  sightLine.far = toMe.length();
+  sightLine.camera = camera;
+  const hidden = new Set(sightLine.intersectObjects(signs, false).map((h) => h.object));
+  for (const o of signs) if (signBox.setFromObject(o).distanceToPoint(camera.position) < 0.6) hidden.add(o);
+  for (const o of hidden) o.visible = false;
+  return () => hidden.forEach((o) => (o.visible = true));
+}
+
 function resize() {
   const w = innerWidth;
   const h = innerHeight;
@@ -316,17 +406,21 @@ renderer.setAnimationLoop(() => {
   }
   player.update(dt);
   office.update(t, dt);
+  arcade.update(dt);
   me.root.position.copy(player.pos);
   me.root.rotation.y = player.facing;
   me.update(dt, player.moving && player.grounded, !player.grounded, player.running ? 1.3 : 1);
-  myBody.set(true, camera);
+  myBody.set(player.view === 'first', camera);
   const it = mode === 'office' ? nearby() : null;
   const hint = $('hint');
   hint.hidden = !it;
   if (it) hint.innerHTML = `<kbd>E</kbd>${it.label}`;
   $('click-to-look').hidden = mode !== 'office' || player.locked;
+  $('crosshair').hidden = player.view === 'third';
   const restore = myBody.hideExtras();
+  const showSigns = hideCloseSigns();
   renderer.render(scene, camera);
+  showSigns();
   restore();
 });
 

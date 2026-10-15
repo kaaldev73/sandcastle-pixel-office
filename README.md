@@ -1,15 +1,18 @@
 # Sandcastle Pixel Office
 
-A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-dev/sandcastle) agent activity. In V3 you make your own CEO and walk round a first-person 3D office: the **Planner**, **Implementer**, **Reviewer**, and **Merger** each have a cubicle where they act out their status, with their log on the wall, and the file stack in the CEO's room switches between your Sandcastle projects. The V2 pixel-art dashboard is still at `/2d`.
+A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-dev/sandcastle) agent activity. In V3 you make your own CEO and walk round a 3D office, in first or third person: the **Planner**, **Implementer**, **Reviewer**, and **Merger** each have a cubicle where they act out their status, with their log on the wall, and the file stack in the CEO's room switches between your Sandcastle projects. The V2 pixel-art dashboard is still at `/2d`.
 
 > **Read-only local monitor.** Pixel Office does not start, stop, schedule, or control agents. It displays information already written by your Sandcastle project.
 
 ## Features
 
-- First-person 3D office: create your CEO, then walk with **WASD** and look with the mouse
+- 3D office: create your CEO, then walk with **WASD** and look with the mouse, in first person or third (**V** switches, the mouse wheel zooms)
 - Five rooms: the CEO's room and a cubicle for each agent, read left to right from the hallway
 - **Project file stack** in the CEO's room: walk up to it and press **E** to switch projects
-- Press **E** at an agent's desk to read its log
+- Agents act out their status at their desks while they work. When they're done, idle or waiting, they wander off to the lounge sofas, the windows or a colleague's desk
+- Press **E** by an agent, wherever it is, to talk to it: it tells you its job, its status and what it's up to, with its log underneath
+- A lounge with windows onto a beach, the sea, woods and mountains
+- A retro computer on the CEO's desk: sit in the CEO's chair and press **E** for Tetris, Snake, Invaders, Breakout and Pong, with high scores kept in your browser
 - Agent status: waiting, working, done, idle, or error, refreshed every **3 seconds**
 - V2 pixel-art dashboard at `/2d`, with recent logs, worktree names and overview counts
 - Runs using **Python's standard library**, with no Python packages or Node to install
@@ -113,6 +116,7 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 | File | Purpose |
 | --- | --- |
 | `client/` | The 3D office's source (TypeScript, three.js, Vite) |
+| `client/src/games/` | The CEO's retro computer: the arcade menu and its games |
 | `client/src/vendor/agent-office/` | Parts adapted from agent-office (MIT), see `THIRD_PARTY_NOTICES.md` |
 | `dist/` | The built 3D office, committed so `python3 server.py` needs no Node |
 | `index.html` | V2 dashboard UI, pixel-art visuals, and client-side polling |

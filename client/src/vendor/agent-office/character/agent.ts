@@ -1,7 +1,7 @@
 // Adapted from agent-office client/world/character/worker.ts and worker-badges.ts (https://github.com/AgentSystemLabs/agent-office, commit 852e2ab).
 // Copyright (c) 2026 AgentSystemLabs. MIT License: see THIRD_PARTY_NOTICES.md.
-// Changes: the Worker's body and status light only, with Sandcastle's statuses acted out more simply;
-// no dances, props, costumes, jail or walking.
+// Changes: the Worker's body and status light only, with Sandcastle's statuses acted out more simply,
+// and a simpler walk; no dances, props, costumes or jail. Where it walks to is wander.ts's.
 
 import * as THREE from 'three';
 import { cardSprite, disposeSprite, mesh, toon, toonUnique } from '../toon';
@@ -39,6 +39,9 @@ export class Agent {
   private cardKey = '';
   private phase = Math.random() * Math.PI * 2;
   status: AgentStatus = 'waiting';
+  /** Set while it walks somewhere (see wander.ts): it steps, and its status act waits. */
+  walking = false;
+  private stepPhase = 0;
 
   constructor(
     private title: string,
@@ -113,7 +116,16 @@ export class Agent {
     let armX = 0;
     let armXR = 0;
     let armZ = 0;
-    switch (this.status) {
+    this.stepPhase = this.walking ? this.stepPhase + dt * 10 : 0;
+    const swing = Math.sin(this.stepPhase);
+    this.feet.forEach((f, i) => (f.position.z = 0.05 + (this.walking ? (i ? -swing : swing) * 0.09 : 0)));
+    if (this.walking) {
+      // Walking: a bounce in its step, arms swinging against its feet.
+      y = Math.abs(swing) * 0.05;
+      lean = 0.06;
+      armX = -swing * 0.5;
+      armXR = swing * 0.5;
+    } else switch (this.status) {
       case 'working':
         // Typing: both hands on the keys, out of step, and a little bounce.
         armX = armXR = -1.1;
@@ -144,7 +156,7 @@ export class Agent {
         y = Math.sin(p * 1.5) * 0.015;
         break;
     }
-    if (this.status !== 'error' && this.status !== 'waiting') this.body.rotation.y *= Math.exp(-dt * 6);
+    if (this.walking || (this.status !== 'error' && this.status !== 'waiting')) this.body.rotation.y *= Math.exp(-dt * 6);
     this.body.position.y += (y - this.body.position.y) * Math.min(1, dt * 12);
     this.body.rotation.x += (lean - this.body.rotation.x) * Math.min(1, dt * 6);
     this.armL.rotation.x += (armX - this.armL.rotation.x) * Math.min(1, dt * 12);
