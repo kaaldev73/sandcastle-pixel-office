@@ -188,7 +188,7 @@ export class Office {
     plate.position.set(0, 0.5, -6.59);
     this.group.add(plate);
     this.group.add(retroPc(this.pcScreen, 0.15, 0.78, -7.0, Math.PI));
-    this.interactables.push({ kind: 'pc', x: 0, z: -8.1, radius: 1.2, label: 'Play games on the computer' });
+    this.interactables.push({ kind: 'pc', x: 0, z: -8.1, radius: 1.2, label: 'Use the computer' });
     this.group.add(mug('#e63946', -0.6, 0.78, -6.9));
     this.group.add(chair(PALETTE.chairs[3], 0, -8.1, Math.PI, 1.15));
 

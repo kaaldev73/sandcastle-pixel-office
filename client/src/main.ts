@@ -6,13 +6,14 @@ import { STATUS_BULB } from './vendor/agent-office/character/agent';
 import { PlayerController } from './vendor/agent-office/player/controller';
 import { mesh, toon } from './vendor/agent-office/toon';
 import { RetroArcade } from './games/arcade';
+import { Computer } from './computer';
 import { fetchProjects, fetchStatus, type ProjectSummary, type StatusSnapshot } from './api';
 import { SHIRTS, loadCeo, randomCeo, saveCeo, type Ceo } from './ceo';
 import { Office, ROLES, SPAWN, WALL_H, type Interactable, type Role } from './office';
 
 // The page: the character screen where you make your CEO, then the office you walk round in first
 // or third person, with the project picker at the file stack, each agent's log at its desk, and the
-// games on the CEO's computer.
+// CEO's computer (games, projects and issues) on the desk.
 
 const POLL_MS = 3000;
 const PROJECT_KEY = 'pixel-office.project';
@@ -76,7 +77,7 @@ let spin = 0.4;
 let spinV = 0.6;
 let dragX: number | null = null;
 
-type Mode = 'creator' | 'office' | 'picker' | 'log' | 'arcade';
+type Mode = 'creator' | 'office' | 'picker' | 'log' | 'pc';
 let mode: Mode = 'creator';
 
 function swatches(el: HTMLElement, colors: string[], names: string[] | null, pick: (i: number) => void) {
@@ -169,6 +170,7 @@ async function loadProjects() {
   if (!projects.some((p) => p.id === current)) current = projects[0]?.id ?? '';
   office.setProjects(projects, current);
   if (mode === 'picker') drawPicker();
+  if (mode === 'pc') computer.refresh();
 }
 
 async function poll() {
@@ -193,14 +195,24 @@ async function poll() {
   if (mode === 'log') drawLog();
 }
 
+/** Watches project `id` in the office, from the file stack (which it puts away) or the computer (which stays on). */
 function choose(id: string) {
   current = id;
   localStorage.setItem(PROJECT_KEY, id);
   office.setProjects(projects, current);
   snapshot = null;
-  closeModal();
+  if (mode === 'pc') computer.refresh();
+  else closeModal();
   void poll();
 }
+
+const computer = new Computer(arcade, {
+  projects: () => projects,
+  current: () => current,
+  choose,
+  refresh: () => void loadProjects(),
+});
+computer.onLeave = () => closeModal();
 
 function drawPicker() {
   const list = $('project-list');
@@ -275,27 +287,27 @@ function drawLog() {
   if (near) feed.scrollTop = feed.scrollHeight;
 }
 
-function openModal(which: 'picker' | 'log' | 'arcade') {
+function openModal(which: 'picker' | 'log' | 'pc') {
   mode = which;
   player.enabled = false;
   player.clearKeys();
   player.unlock();
-  $(which).hidden = false;
   if (which === 'picker') {
+    $(which).hidden = false;
     drawPicker();
     void loadProjects();
   } else if (which === 'log') {
+    $(which).hidden = false;
     office.talk(logRole, player.pos);
     drawLog();
-  }
-  else arcade.show();
+  } else computer.show();
 }
 
 function closeModal() {
-  if (mode !== 'picker' && mode !== 'log' && mode !== 'arcade') return;
-  if (mode === 'arcade') arcade.hide();
+  if (mode !== 'picker' && mode !== 'log' && mode !== 'pc') return;
+  if (mode === 'pc') computer.hide();
+  else $(mode).hidden = true;
   if (mode === 'log') office.talk(null, null);
-  $(mode).hidden = true;
   mode = 'office';
   player.enabled = true;
   player.lock();
@@ -305,7 +317,7 @@ for (const b of document.querySelectorAll<HTMLElement>('[data-close]')) b.onclic
 
 function use(it: Interactable) {
   if (it.kind === 'files') openModal('picker');
-  else if (it.kind === 'pc') openModal('arcade');
+  else if (it.kind === 'pc') openModal('pc');
   else {
     logRole = it.role;
     openModal('log');
@@ -327,7 +339,8 @@ function nearby(): Interactable | null {
 }
 
 window.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement) return;
+  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+  if (typing && !(mode === 'pc' && e.code === 'Escape')) return;
   if (mode === 'office') {
     if (e.code === 'KeyE') {
       const it = nearby();
@@ -337,11 +350,14 @@ window.addEventListener('keydown', (e) => {
       player.setView(player.view === 'first' ? 'third' : 'first');
       localStorage.setItem(VIEW_KEY, player.view);
     }
-  } else if (mode === 'arcade') {
+  } else if (mode === 'pc') {
     if (e.code === 'Escape') {
-      if (!arcade.back()) closeModal();
-    } else arcade.keydown(e.code, e.repeat);
-    if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+      if (typing) (e.target as HTMLElement).blur();
+      if (!computer.back()) closeModal();
+    } else if (computer.view === 'game') {
+      arcade.keydown(e.code, e.repeat);
+      if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+    }
   } else if (mode === 'picker' || mode === 'log') {
     if (e.code === 'Escape' || e.code === 'KeyE') closeModal();
     const n = Number(e.key);
@@ -430,4 +446,4 @@ setInterval(poll, POLL_MS);
 setInterval(() => mode !== 'picker' && void loadProjects(), POLL_MS * 4);
 
 // For poking at the office from the console (and headless screenshots) while developing.
-if (import.meta.env.DEV) Object.assign(window, { pixelOffice: { player, office, choose } });
+if (import.meta.env.DEV) Object.assign(window, { pixelOffice: { player, office, choose, computer } });

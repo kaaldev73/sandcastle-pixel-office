@@ -11,6 +11,15 @@ export interface ProjectSummary {
   /** How many of its agents are in each status. */
   counts: Partial<Record<AgentStatus, number>>;
   branches: number;
+  /** Where it is, with ~ for home. */
+  path: string;
+  /** What the app is for: from projects.json, its package.json, or its README. */
+  description: string | null;
+  /** The port its app runs on (from projects.json, or guessed from its dev scripts), whether something's listening there, and where to open it. */
+  port: number | null;
+  portGuessed: boolean;
+  running: boolean;
+  url: string | null;
 }
 
 export interface AgentSnapshot {
@@ -36,4 +45,12 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const fetchProjects = () => get<{ projects: ProjectSummary[] }>('/api/projects').then((r) => r.projects);
+/** Opens a GitHub issue on the project's repo, for the Planner to pick up: its address, or why not. */
+export async function fileIssue(project: string, title: string, body: string): Promise<string> {
+  const res = await fetch('/api/issues', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project, title, body }) });
+  const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data.url;
+}
+
 export const fetchStatus = (project: string) => get<StatusSnapshot>(`/api/status?project=${encodeURIComponent(project)}`);

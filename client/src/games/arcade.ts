@@ -105,6 +105,12 @@ export class RetroArcade {
     this.keys.held.delete(code);
   }
 
+  /** Starts the game with this id, straight from the computer's Games folder. */
+  play(id: string) {
+    const info = GAMES.find((g) => g.id === id);
+    if (info) this.start(info);
+  }
+
   /** Esc: out of a game back to the menu (true), or nothing left to back out of (false). */
   back(): boolean {
     if (!this.game) return false;
@@ -199,7 +205,7 @@ export class RetroArcade {
       text(g, 'GAME OVER', W / 2, 88, '#ef476f', 3, 'center');
       text(g, `SCORE ${this.game.score}`, W / 2, 112, '#fff', 2, 'center');
       if (this.newHi && Math.floor(this.t * 3) % 2) text(g, 'NEW HIGH SCORE!', W / 2, 128, '#ffd166', 1, 'center');
-      text(g, 'ENTER AGAIN   ESC MENU', W / 2, 140, '#8892b0', 1, 'center');
+      text(g, 'ENTER AGAIN   ESC QUIT', W / 2, 140, '#8892b0', 1, 'center');
     } else if (this.paused) {
       this.panel(90);
       text(g, 'PAUSED', W / 2, 100, '#ffd166', 3, 'center');

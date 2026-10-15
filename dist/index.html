@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Sandcastle • Pixel Office</title>
     <link rel="icon" href="data:," />
-    <script type="module" crossorigin src="/static/index-CTZuTXpJ.js"></script>
-    <link rel="stylesheet" crossorigin href="/static/index-w3pjhWjA.css">
+    <script type="module" crossorigin src="/static/index-Crl7axbw.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/index-DLQze4kV.css">
   </head>
   <body>
     <canvas id="scene"></canvas>
@@ -53,10 +53,51 @@
       <div id="log-lines" class="feed"></div>
     </section>
 
-    <section id="arcade" class="panel modal arcade" hidden>
-      <div class="modal-head"><h2>🕹️ The CEO's computer</h2><button class="ghost close" data-close>Esc ✕</button></div>
-      <div class="crt" id="arcade-screen"></div>
-      <div class="muted small">Arrows or WASD move · Space / Enter action · P pause · M sound · Esc back</div>
+    <section id="pc" class="pc" hidden>
+      <div class="pc-desktop">
+        <button class="icon" data-open="games"><span class="glyph">📁</span><span class="name">Games</span></button>
+        <button class="icon" data-open="projects"><span class="glyph">📁</span><span class="name">Projects</span></button>
+        <button class="icon" data-open="issue"><span class="glyph">📝</span><span class="name">New issue</span></button>
+      </div>
+      <div class="win" id="pc-win" hidden>
+        <div class="win-bar"><span id="pc-win-title"></span><button class="win-x" id="pc-win-close" title="Close (Esc)">✕</button></div>
+        <div class="win-body">
+          <div id="pc-games" class="folder" hidden></div>
+          <div id="pc-game" class="game" hidden>
+            <div class="crt" id="arcade-screen"></div>
+            <div class="muted small">Arrows or WASD move · Space / Enter action · P pause · M sound · Esc back to Games</div>
+          </div>
+          <div id="pc-projects" class="apps" hidden></div>
+          <div id="pc-issue" class="issue" hidden>
+            <form id="pc-issue-form">
+              <label class="field">Project <select id="issue-project"></select></label>
+              <label class="field">Title <input id="issue-title" maxlength="200" autocomplete="off" placeholder="Search doesn't find nested folders" /></label>
+              <label class="field">What's wrong? <textarea id="issue-problem" rows="5" placeholder="What happens, and where. Steps to see it."></textarea></label>
+              <label class="field">What do you want? <textarea id="issue-want" rows="5" placeholder="What it should do instead, or the feature you'd like."></textarea></label>
+              <div class="row">
+                <button type="button" id="issue-new" class="ghost">New</button>
+                <span class="spacer"></span>
+                <button type="button" id="issue-save">💾 Save draft</button>
+                <button type="button" id="issue-file" class="primary">File on GitHub</button>
+              </div>
+              <p class="muted small" id="issue-said"></p>
+            </form>
+            <aside>
+              <h3>Saved issues</h3>
+              <div id="issue-drafts" class="drafts"></div>
+              <p class="muted small">Filing opens a GitHub issue on the project's repo with <code>gh</code>. Sandcastle's Planner picks up open issues on its next run.</p>
+            </aside>
+          </div>
+        </div>
+      </div>
+      <div class="taskbar">
+        <span class="start">🏰 Sandcastle</span>
+        <span class="task" id="pc-task"></span>
+        <span class="spacer"></span>
+        <button id="pc-full" title="Browser full screen (F11)">Full screen</button>
+        <button id="pc-off">⏻ Get up <kbd>Esc</kbd></button>
+        <span id="pc-clock"></span>
+      </div>
     </section>
 
   </body>

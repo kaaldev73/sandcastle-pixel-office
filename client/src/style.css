@@ -71,9 +71,57 @@ button:hover { transform: translateY(-1px); }
 .feed div { border-bottom: 1px solid #1b2940; overflow-wrap: anywhere; padding: 2px 0; }
 .feed div:last-child { color: #80e6bd; }
 
-/* The CEO's computer: the arcade on a CRT, big chunky pixels and scanlines. */
-.arcade { width: min(820px, calc(100vw - 32px)); background: #e8dcc0; }
-.crt { position: relative; width: min(100%, calc((100vh - 190px) * 4 / 3)); aspect-ratio: 4 / 3; margin: 0 auto; background: #000; border: 14px solid #2b2d42; border-radius: 28px; overflow: hidden; }
+/* The CEO's computer, sat at up close: a retro desktop over the whole screen, with one window open at a time. */
+.pc { position: fixed; inset: 0; display: flex; flex-direction: column; background: #2a9d8f radial-gradient(circle at 50% 40%, #3fb5a5, #1f7a70); z-index: 10; }
+.pc-desktop { flex: 1; display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start; gap: 10px; padding: 20px; }
+.icon { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 104px; padding: 10px 6px; background: none; border: 3px solid transparent; color: #fff; text-shadow: 0 2px 0 #0006; }
+.icon .glyph { font-size: 44px; line-height: 1; }
+.icon:hover, .icon:focus-visible { background: #ffffff26; border-color: #fffaf3; outline: none; }
+.win { position: absolute; inset: 16px 16px 62px; display: flex; flex-direction: column; background: var(--paper); border: 4px solid var(--ink); border-radius: 14px; box-shadow: 0 8px 0 #0004; overflow: hidden; }
+.win-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 14px; background: var(--ink); color: var(--paper); font-weight: 800; }
+.win-x { padding: 0 10px; font-size: 14px; border-color: var(--paper); }
+.win-body { flex: 1; min-height: 0; overflow: auto; padding: 18px; }
+.win-body .icon { color: var(--ink); text-shadow: none; }
+.win-body .icon:hover, .win-body .icon:focus-visible { background: #fff3c4; border-color: var(--ink); }
+.folder { display: flex; flex-wrap: wrap; gap: 12px; }
+.game { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #e8dcc0; margin: -18px; padding: 12px; }
+.taskbar { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 10px; background: var(--paper); border-top: 4px solid var(--ink); font-weight: 800; }
+.taskbar button { padding: 4px 10px; font-size: 13px; }
+.taskbar kbd { background: var(--gold); border-radius: 5px; padding: 0 5px; font: inherit; font-size: 11px; }
+.start { background: var(--gold); border: 3px solid var(--ink); border-radius: 10px; padding: 3px 10px; }
+.task:not(:empty) { border: 3px solid var(--ink); border-radius: 10px; padding: 3px 10px; background: #fff3c4; }
+.spacer { flex: 1; }
+.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-content: start; }
+.app { border: 3px solid var(--ink); border-radius: 14px; padding: 12px 14px; background: #fff; display: flex; flex-direction: column; gap: 6px; }
+.app.on { background: #fff3c4; }
+.app p { margin: 0; }
+.app-head { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.app .tab { width: 26px; height: 20px; border-radius: 4px 4px 2px 2px; border: 3px solid var(--ink); flex: none; }
+.port { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.dot.up { background: #06d6a0; box-shadow: 0 0 0 3px #06d6a044; }
+.dot.down { background: #c9c9d6; }
+.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.acts button, .btn { padding: 4px 10px; font-size: 13px; }
+.btn { font-weight: 800; border: 3px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); text-decoration: none; }
+.btn.primary { background: var(--gold); }
+.issue { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 20px; max-width: 1100px; margin: 0 auto; }
+.issue .field select, .issue .field textarea, .issue .field input { display: block; width: 100%; margin-top: 4px; font: inherit; font-weight: 400; padding: 8px 10px; border: 3px solid var(--ink); border-radius: 10px; background: #fff; }
+.issue textarea { resize: vertical; }
+.app-head .pill { white-space: nowrap; margin-left: auto; }
+.issue .row { align-items: center; }
+.issue button:disabled { opacity: 0.5; cursor: default; transform: none; }
+h3 { margin: 0 0 8px; font-size: 16px; }
+.drafts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.draft { display: flex; align-items: center; gap: 6px; }
+.draft.on .draft-pick { background: #fff3c4; }
+.draft-pick { flex: 1; min-width: 0; text-align: left; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-width: 2px; }
+.draft-x { padding: 2px 8px; font-size: 12px; border-width: 2px; }
+.pill.filed { background: #06d6a0; color: var(--ink); text-decoration: none; }
+@media (max-width: 760px) { .issue { grid-template-columns: 1fr; } }
+
+/* The arcade on a CRT, big chunky pixels and scanlines. */
+.crt { position: relative; width: min(100%, calc((100vh - 170px) * 4 / 3)); aspect-ratio: 4 / 3; margin: 0 auto; background: #000; border: 14px solid #2b2d42; border-radius: 28px; overflow: hidden; }
 .crt canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .crt::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, #0000002e 0 1px, transparent 1px 3px); box-shadow: inset 0 0 70px #000000a0; }
 
