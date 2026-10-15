@@ -1,5 +1,6 @@
 import { fileIssue, showOnScreen, startApp, startSandcastle, stopApp, stopSandcastle, writeUp, type IssueKind, type ProjectSummary } from './api';
 import { GAMES, type RetroArcade } from './games/arcade';
+import { drawRuns } from './runbar';
 import { STATUS_BULB } from './vendor/agent-office/character/agent';
 
 // The CEO's computer, sat at up close: a retro desktop filling the screen, with a Games folder (the
@@ -103,6 +104,7 @@ export class Computer {
   show() {
     $('pc').hidden = false;
     this.open('desktop');
+    this.drawRuns();
     this.tick();
     this.clock = window.setInterval(() => this.tick(), 10_000);
     // While an app's starting up, keep asking whether it's up yet.
@@ -158,6 +160,7 @@ export class Computer {
 
   /** The projects changed (they're fetched every few seconds): redraws what shows them. */
   refresh() {
+    this.drawRuns();
     if (this.view === 'app') this.drawApp();
     else if (this.view === 'projects') this.drawProjects();
     else if (this.view === 'issue') {
@@ -173,6 +176,11 @@ export class Computer {
     btn.textContent = p?.sandcastleStarted ? '■ Stop Sandcastle' : '🏰 Start Sandcastle';
     btn.disabled = !p?.sandcastle;
     btn.title = p?.sandcastle ? 'Have the Planner pick up the open issues now' : 'Give this project "sandcastle" in projects.json first';
+  }
+
+  /** The Sandcastle runs going, on the taskbar next to 🏰 Sandcastle. */
+  private drawRuns() {
+    drawRuns($('pc-runs'), this.desk.projects(), { watch: (id) => this.open('app', id, true), refresh: () => this.desk.refresh() });
   }
 
   private tick() {

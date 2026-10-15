@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Sandcastle • Pixel Office</title>
     <link rel="icon" href="data:," />
-    <script type="module" crossorigin src="/static/index-b4lNOQmO.js"></script>
-    <link rel="stylesheet" crossorigin href="/static/index-1NcL8dIC.css">
+    <script type="module" crossorigin src="/static/index-ck5qJATu.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/index-BPLXA67b.css">
   </head>
   <body>
     <canvas id="scene"></canvas>
@@ -23,7 +23,7 @@
         <button id="ceo-random" class="ghost">🎲 Surprise me</button>
         <button id="ceo-enter" class="primary">Enter the office →</button>
       </div>
-      <p class="muted">Drag the preview to spin your CEO. Pixel Office only reads Sandcastle logs: it never starts or stops agents.</p>
+      <p class="muted">Drag the preview to spin your CEO. Pixel Office shows what your Sandcastle agents are doing, from their logs.</p>
     </section>
 
     <section id="hud" hidden>
@@ -38,6 +38,7 @@
         <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump · <b>Mouse</b> look · <b>E</b> use · <b>V</b> view · <b>C</b> change CEO
       </div>
       <div class="click" id="click-to-look">Click to look around</div>
+      <div class="runs" id="office-runs" hidden></div>
     </section>
 
     <section id="picker" class="panel modal" hidden>
@@ -104,6 +105,7 @@
       <div class="taskbar">
         <span class="start">🏰 Sandcastle</span>
         <span class="task" id="pc-task"></span>
+        <span class="runs" id="pc-runs" hidden></span>
         <span class="spacer"></span>
         <button id="pc-full" title="Browser full screen (F11)">Full screen</button>
         <button id="pc-off">⏻ Get up <kbd>Esc</kbd></button>

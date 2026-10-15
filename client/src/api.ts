@@ -33,6 +33,9 @@ export interface ProjectSummary {
   sandcastleStarted: boolean;
   sandcastleExitCode: number | null;
   sandcastleOutput: string[];
+  /** The issue that run is on ("#14 FEAT-008: …"), once it's planned; and which of the project's agents are working. */
+  sandcastleIssue: string | null;
+  busy: string[];
 }
 
 export interface AgentSnapshot {

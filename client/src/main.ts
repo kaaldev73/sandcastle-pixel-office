@@ -7,6 +7,7 @@ import { PlayerController } from './vendor/agent-office/player/controller';
 import { mesh, toon } from './vendor/agent-office/toon';
 import { RetroArcade } from './games/arcade';
 import { Computer } from './computer';
+import { drawRuns } from './runbar';
 import { fetchProjects, fetchStatus, type ProjectSummary, type StatusSnapshot } from './api';
 import { SHIRTS, loadCeo, randomCeo, saveCeo, type Ceo } from './ceo';
 import { Office, ROLES, SPAWN, WALL_H, type Interactable, type Role } from './office';
@@ -169,6 +170,13 @@ async function loadProjects() {
   }
   if (!projects.some((p) => p.id === current)) current = projects[0]?.id ?? '';
   office.setProjects(projects, current);
+  drawRuns($('office-runs'), projects, {
+    watch: (id) => {
+      openModal('pc');
+      computer.open('app', id, true);
+    },
+    refresh: () => void loadProjects(),
+  });
   if (mode === 'picker') drawPicker();
   if (mode === 'pc') computer.refresh();
 }
@@ -442,7 +450,9 @@ renderer.setAnimationLoop(() => {
 openCreator();
 void loadProjects().then(poll);
 setInterval(poll, POLL_MS);
-setInterval(() => mode !== 'picker' && void loadProjects(), POLL_MS * 4);
+// The projects every few polls; every poll while Sandcastle's running, for its strip along the bottom.
+let polls = 0;
+setInterval(() => mode !== 'picker' && (++polls % 4 === 0 || projects.some((p) => p.sandcastleStarted)) && void loadProjects(), POLL_MS);
 
 // For poking at the office from the console (and headless screenshots) while developing.
 if (import.meta.env.DEV) Object.assign(window, { pixelOffice: { player, office, choose, computer } });

@@ -271,6 +271,14 @@ def app_address(p):
            p["url"] if isinstance(p["url"], str) else (f"http://localhost:{port}/{page}" if port else None))
     return port, url
 
+def run_issue(run):
+    """The issue a Sandcastle run is on, from what it printed when it planned ("  14: FEAT-008: Title → branch")."""
+    for line in reversed(run.output):
+        m = re.match(r"\s*(\d+): (.+?) → \S+$", line)
+        if m:
+            return f"#{m.group(1)} {m.group(2)}"
+    return None
+
 def project_list():
     out = []
     for p in load_projects():
@@ -290,6 +298,8 @@ def project_list():
                     "sandcastleStarted": bool(run) and run.proc.poll() is None,
                     "sandcastleExitCode": run.proc.poll() if run else None,
                     "sandcastleOutput": list(run.output)[-8:] if run else [],
+                    "sandcastleIssue": run_issue(run) if run else None,
+                    "busy": [a["role"] for a in snap["agents"] if a["status"] == "working"],
                     "counts": counts, "branches": len(snap["branches"]),
                     "path": str(p["root"]).replace(str(Path.home()), "~", 1),
                     "description": p["description"] if isinstance(p["description"], str) else describe(p["root"]),

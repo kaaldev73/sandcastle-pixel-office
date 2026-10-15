@@ -53,6 +53,12 @@ button:hover { transform: translateY(-1px); }
 .hint { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 6px 14px; border-radius: 999px; font-weight: 800; pointer-events: none; }
 .hint kbd { background: var(--gold); color: var(--ink); border-radius: 6px; padding: 0 6px; margin-right: 6px; font: inherit; }
 .help { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 14px; font-size: 13px; white-space: nowrap; }
+.runs { display: flex; flex-direction: column; gap: 6px; }
+#office-runs { position: fixed; left: 16px; bottom: 56px; max-width: calc(100vw - 32px); }
+#pc-runs { flex: 1 1 auto; min-width: 0; flex-direction: row; overflow: hidden; }
+.run { display: flex; align-items: center; gap: 8px; background: #fff3c4; border: 3px solid var(--ink); border-radius: 10px; padding: 3px 6px 3px 10px; font-size: 13px; font-weight: 800; }
+.run-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run button { padding: 2px 8px; font-size: 12px; flex: none; }
 .click { position: fixed; left: 50%; top: 42%; transform: translateX(-50%); background: #2b2d42cc; color: var(--paper); padding: 8px 16px; border-radius: 12px; font-weight: 800; pointer-events: none; }
 
 .modal { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 64px); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
