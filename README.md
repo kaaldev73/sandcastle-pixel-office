@@ -189,6 +189,28 @@ If your Sandcastle setup writes logs elsewhere or uses different filenames, the 
 
 **A project's agents all show *waiting*:** Check its `"path"` in `projects.json` still exists. A folder under `/tmp` is gone after a restart.
 
+**Sandcastle stopped when Pixel Office was restarted:** A run started from the office stops with it. Before restarting `server.py`, check no Sandcastle strip is showing along the bottom (or wait for it to finish); afterwards press **Start Sandcastle** and the Planner picks the open issues up again.
+
+**The Planner isn't at his desk though you've just filed an issue:** Agents go to their desks while they're *working*, and planning takes about a minute: then the Planner is *done* and the Implementer, Reviewer and Merger take over in turn. Look at whose status is *working* (top left, or the strip along the bottom).
+
+### The strip along the bottom
+
+**No strip while Sandcastle is running:** It shows only for runs started from the office, not ones in a terminal. Reload the page after updating Pixel Office, since the page keeps the version it loaded.
+
+**The strip says "planning" and names no agents:** The page is newer than the server. Restart `python3 server.py` (see above: it stops a run it started).
+
+**Its buttons don't respond in the office:** The mouse is captured for looking around. Press **Esc** to get the pointer back, then click.
+
+**No Watch in office or On my screen on it:** They show once the project's app is running. Press **▶ Run app** (it needs `"run"` in `projects.json`), or start the app yourself.
+
+### After Sandcastle has changed your app
+
+**The change doesn't show in the app or Chrome extension:** Sandcastle changes the source and merges it into your branch, but doesn't rebuild what you're running. For a Chrome extension loaded unpacked from `dist/`, run `npm run build` in the project, press reload on it in `chrome://extensions`, and reopen its window or side panel. A dev server (`"run"`) usually reloads by itself; if not, stop and run it again.
+
+**The change isn't on GitHub:** Sandcastle merges into your local branch and doesn't push. Push it yourself (`git push`, in the project's folder) when you're happy with it.
+
+**The issue is still open on GitHub after Sandcastle finished:** Sandcastle's Merger closes it when it merges the work, so it probably wasn't merged: look at the Merger's log in `.sandcastle/logs/` (or press E at its desk). Issues the Planner found blocked by another wait for that one to be done first.
+
 ## Project files
 
 | File | Purpose |
