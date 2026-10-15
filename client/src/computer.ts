@@ -1,4 +1,4 @@
-import { fileIssue, startApp, stopApp, type ProjectSummary } from './api';
+import { fileIssue, showOnScreen, startApp, stopApp, type ProjectSummary } from './api';
 import { GAMES, type RetroArcade } from './games/arcade';
 import { STATUS_BULB } from './vendor/agent-office/character/agent';
 
@@ -178,7 +178,7 @@ export class Computer {
     const up = p.running && !!p.url;
     $('pc-win-stop').hidden = !p.started;
     $('pc-win-out').hidden = !up;
-    if (up) $<HTMLAnchorElement>('pc-win-out').href = p.url!;
+    $('pc-win-out').onclick = () => void this.toScreen(p.id);
     $('pc-app-boot').hidden = up;
     $('pc-app-frame').hidden = !up;
     this.load(up ? p.url : null);
@@ -215,6 +215,14 @@ export class Computer {
     }
     this.open('app', id);
     this.desk.refresh();
+  }
+
+  private async toScreen(id: string) {
+    try {
+      await showOnScreen(id);
+    } catch (e) {
+      alert((e as Error).message);
+    }
   }
 
   private async stop(id: string) {
@@ -288,12 +296,11 @@ export class Computer {
         here.onclick = () => this.open('app', p.id);
         acts.append(here);
       }
-      if (p.url) {
-        const open = el('a', 'btn', p.running ? 'New tab ↗' : 'Try opening ↗');
-        open.href = p.url;
-        open.target = '_blank';
-        open.rel = 'noopener';
-        acts.append(open);
+      if (p.url && p.running) {
+        const out = el('button', '', '🖥️ On my screen');
+        out.title = 'Open it in your normal browser, outside the office';
+        out.onclick = () => void this.toScreen(p.id);
+        acts.append(out);
       }
       if (p.id !== this.desk.current()) {
         const watch = el('button', '', 'Watch in office');

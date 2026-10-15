@@ -66,5 +66,7 @@ export const fileIssue = (project: string, title: string, body: string) => post<
 /** Runs a project's app with its "run" command from projects.json, or stops it again. */
 export const startApp = (project: string) => post('/api/apps/start', { project });
 export const stopApp = (project: string) => post('/api/apps/stop', { project });
+/** Opens the app in the normal browser on the CEO's own screen, outside wherever the office is open. */
+export const showOnScreen = (project: string) => post('/api/apps/screen', { project });
 
 export const fetchStatus = (project: string) => get<StatusSnapshot>(`/api/status?project=${encodeURIComponent(project)}`);

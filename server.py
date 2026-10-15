@@ -4,10 +4,11 @@
 It only reads Sandcastle's logs: it never starts or stops agents. From the CEO's computer you can file
 a GitHub issue (with `gh`, in that project's folder), and run and stop a project's app with the command
 projects.json gives it (its "run"). A project can also have its built app served (read-only, on a port
-of its own). Apps it started are stopped when it stops."""
+of its own). An app it runs opens on your own screen, in your normal browser, once it's up. Apps it
+started are stopped when it stops."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import json, re, time, os, sys, mimetypes, socket, subprocess, threading, zlib, shlex, signal, atexit
+import json, re, time, os, sys, mimetypes, socket, subprocess, threading, zlib, shlex, signal, atexit, webbrowser
 from collections import deque
 from functools import partial
 from http.server import SimpleHTTPRequestHandler
@@ -45,7 +46,8 @@ def load_projects():
                 return projects
         except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
             print(f"Ignoring projects.json: {e}", file=sys.stderr, flush=True)
-    return [{"id": DEFAULT_ROOT.name, "name": DEFAULT_ROOT.name, "root": DEFAULT_ROOT}]
+    return [{"id": DEFAULT_ROOT.name, "name": DEFAULT_ROOT.name, "root": DEFAULT_ROOT, "description": None,
+             "port": None, "url": None, "serve": None, "page": None, "run": None}]
 
 def find_project(pid):
     projects = load_projects()
@@ -174,9 +176,31 @@ def start_app(project):
         if port and listening(port):
             return 409, {"error": f"Something is already running on port {port}."}
         try:
-            APPS[project["id"]] = App(project)
+            app = APPS[project["id"]] = App(project)
         except (OSError, ValueError) as e:
             return 500, {"error": f"Couldn't run it: {e}"}
+    threading.Thread(target=show_when_up, args=(app, project), daemon=True).start()
+    return 200, {"ok": True}
+
+def show_when_up(app, project, wait=180):
+    """Opens a just-started app on the CEO's own screen once its server's listening (or gives up when it exits)."""
+    port, url = app_address(project)
+    end = time.time() + wait
+    while port and url and app.proc.poll() is None and time.time() < end:
+        if listening(port):
+            webbrowser.open(url)
+            return
+        time.sleep(0.5)
+
+def show_on_screen(project):
+    """Opens the project's app in the CEO's normal browser, on their own screen, outside wherever the office is."""
+    port, url = app_address(project)
+    if not url:
+        return 400, {"error": 'No address for it: give it "port" or "url" in projects.json.'}
+    if port and not listening(port):
+        return 409, {"error": "It isn't running."}
+    if not webbrowser.open(url):
+        return 500, {"error": "Couldn't find a browser to open it in."}
     return 200, {"ok": True}
 
 def stop_app(project):
@@ -194,6 +218,15 @@ def stop_apps():
     for app in list(APPS.values()):
         app.stop()
 
+def app_address(p):
+    """The port the project's app is on and where to open it: its served folder, else its "url", else its port."""
+    served = serve_app(p) if isinstance(p["serve"], str) else None
+    port = served or (p["port"] if isinstance(p["port"], int) else guess_port(p["root"]))
+    page = str(p["page"] or "").lstrip("/")
+    url = (f"http://localhost:{port}/{page}" if served else
+           p["url"] if isinstance(p["url"], str) else (f"http://localhost:{port}/{page}" if port else None))
+    return port, url
+
 def project_list():
     out = []
     for p in load_projects():
@@ -202,8 +235,7 @@ def project_list():
         for a in snap["agents"]:
             counts[a["status"]] = counts.get(a["status"], 0) + 1
         served = serve_app(p) if isinstance(p["serve"], str) else None
-        port = served or (p["port"] if isinstance(p["port"], int) else guess_port(p["root"]))
-        page = str(p["page"] or "").lstrip("/")
+        port, url = app_address(p)
         app = APPS.get(p["id"])
         out.append({"id": p["id"], "name": p["name"], "found": (p["root"] / ".sandcastle").is_dir(),
                     "runnable": isinstance(p["run"], str) and bool(p["run"].strip()),
@@ -217,8 +249,7 @@ def project_list():
                     "served": str(p["serve"]) if served else None,
                     "unbuilt": isinstance(p["serve"], str) and not served,
                     "running": bool(port) and listening(port),
-                    "url": f"http://localhost:{port}/{page}" if served else
-                           p["url"] if isinstance(p["url"], str) else (f"http://localhost:{port}/{page}" if port else None)})
+                    "url": url})
     return {"projects": out}
 
 def file_issue(project, title, body):
@@ -280,7 +311,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
-        if path not in ("/api/issues", "/api/apps/start", "/api/apps/stop"):
+        if path not in ("/api/issues", "/api/apps/start", "/api/apps/stop", "/api/apps/screen"):
             self.send_error(404)
             return
         # Only from this page: another site open in the browser can't send JSON here without asking
@@ -303,7 +334,8 @@ class Handler(BaseHTTPRequestHandler):
             if not project:
                 self.send_json(400, {"error": "No such project."})
             else:
-                self.send_json(*(start_app if path == "/api/apps/start" else stop_app)(project))
+                act = {"/api/apps/start": start_app, "/api/apps/stop": stop_app, "/api/apps/screen": show_on_screen}[path]
+                self.send_json(*act(project))
             return
         if not project or not title:
             self.send_json(400, {"error": "Pick a project and give the issue a title."})

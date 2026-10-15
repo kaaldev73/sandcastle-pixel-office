@@ -14,7 +14,7 @@ A lightweight office for watching local [Sandcastle](https://github.com/ai-hero-
 - A lounge with windows onto a beach, the sea, woods and mountains
 - A retro computer on the CEO's desk: sit in the CEO's chair and press **E**, and its desktop fills the screen:
   - **Games**: Tetris, Snake, Invaders, Breakout and Pong, with high scores kept in your browser
-  - **Projects**: each app, what it's for, the port it runs on and whether it's up, with **Run** and **Stop** for its dev server; it opens in a window on the computer once it's up, or in a new tab
+  - **Projects**: each app, what it's for, the port it runs on and whether it's up, with **Run** and **Stop** for its dev server; once it's up it opens on your own screen in your normal browser (outside VS Code or wherever the office is), and in a window on the computer; **On my screen** opens it there again
   - **New issue**: write what's wrong and what you want, then save it as a draft or file it as a GitHub issue (with `gh`, in the project's folder) for the Planner to pick up
 - Agent status: waiting, working, done, idle, or error, refreshed every **3 seconds**
 - V2 pixel-art dashboard at `/2d`, with recent logs, worktree names and overview counts
